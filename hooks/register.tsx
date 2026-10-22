@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { Member } from '../types'
-import { ACCENT, BAR_H, SPRITE_H, SPRITE_W, barSvg, classOf, pctOf, spriteSvg, statusOf, timesOf } from './sprites'
+import { BAR_H, SPRITE_H, SPRITE_W, WARN, barSvg, classOf, elapsedOf, etaOf, pctOf, spriteSvg, statusOf, stepOf } from './sprites'
 
 const PANE = 'demo-team-roster'
 // Cells across the narrowest the pane can be, until the real one has been seen.
@@ -560,35 +560,35 @@ export const register: Register = on => {
         {rows.map(row => (
           <Box flexDirection="row">
             {row.map(m => (
-              <Box width={width} flexDirection="row" gap={1}>
+              <Box width={width} flexDirection="row" gap={1} alignItems="center">
                 {Svg ? (
-                  <Svg source={spriteSvg(m)} alt={`${m.name}, ${m.cls}, ${m.state}`} width={SPRITE_W} height={SPRITE_H} />
+                  <Svg source={spriteSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}`} width={SPRITE_W} height={SPRITE_H} />
                 ) : (
                   <Text>{m.state === 'working' ? '>' : 'z'}</Text>
                 )}
                 <Box flexDirection="column" flexGrow={1}>
                   <Box justifyContent="space-between">
-                    <Text weight="semibold">{m.name}</Text>
-                    <Text color={m.state === 'working' ? ACCENT[m.cls] : m.isBlocked ? '#c0392b' : undefined} dimColor={m.state !== 'working' && !m.isBlocked} size="footnote">
-                      {statusOf(m)}
+                    <Text weight="semibold" size="footnote">
+                      {m.name}
+                    </Text>
+                    <Text size="footnote" dimColor>
+                      {pctOf(m) || ' '}
+                    </Text>
+                  </Box>
+                  <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
+                  <Box justifyContent="space-between">
+                    <Text size="footnote" dimColor>
+                      {elapsedOf(m) || ' '}
+                    </Text>
+                    <Text size="footnote" dimColor>
+                      {etaOf(m) || ' '}
                     </Text>
                   </Box>
                   <Text wrap="truncate-end" size="footnote" dimColor={m.state !== 'working'}>
-                    {m.task ?? (m.state === 'working' ? 'working…' : ' ')}
+                    {m.task ?? (m.state === 'working' ? 'working…' : 'no task')}
                   </Text>
-                  <Box flexDirection="row" gap={1} alignItems="center">
-                    <Box flexGrow={1}>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
-                    <Box width={4} justifyContent="flex-end">
-                      <Text size="caption" dimColor>
-                        {pctOf(m) || ' '}
-                      </Text>
-                    </Box>
-                  </Box>
-                  <Text wrap="truncate-end" size="caption" dimColor>
-                    {m.note ?? ' '}
-                  </Text>
-                  <Text wrap="truncate-end" size="caption" dimColor>
-                    {timesOf(m) || ' '}
+                  <Text wrap="truncate-end" size="footnote" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
+                    {stepOf(m) || ' '}
                   </Text>
                 </Box>
               </Box>

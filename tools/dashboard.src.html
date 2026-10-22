@@ -115,7 +115,7 @@ button{font:inherit;color:inherit;cursor:pointer}
     var m = norm(raw), run = m.state==='working';
     var task = (m.task && m.task!==m.name) ? m.task : (run ? 'working…' : 'no task');
     var stClass = run ? 'on' : m.isBlocked ? 'bad' : '';
-    return '<div class="m'+(m.role==='orchestrator'?' orch':'')+'"><div class="spr">'+spriteSvg(m)+'</div><div class="mb">'+
+    return '<div class="m'+(m.role==='orchestrator'?' orch':'')+'"><div class="spr">'+spriteSvg(m,44,40)+'</div><div class="mb">'+
       '<div class="r1"><span class="nm">'+esc(m.name)+'</span><span class="st '+stClass+'">'+esc(statusOf(m))+'</span></div>'+
       '<div class="task'+(run?' on':'')+'" title="'+esc(task)+'">'+esc(task)+'</div>'+
       '<div class="prog"><div class="barbox">'+barSvg(m)+'</div><div class="pctn">'+esc(pctOf(m))+'</div></div>'+

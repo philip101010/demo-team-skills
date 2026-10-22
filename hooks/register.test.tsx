@@ -39,8 +39,8 @@ test('the pane draws the team', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const row = await ui.find({ type: 'Text', text: /Gareth/ })
   expect(row?.text).toBe('Gareth')
-  // No progress report: the bar falls back to the helper's own task files, read from a one-line header.
-  expect((await ui.find({ type: 'Text', text: /0\/1/ }))?.text).toContain('0/1')
+  // An idle helper with no task of its own reads "no task"; the percent shows only while it works.
+  expect((await ui.find({ type: 'Text', text: /no task/ }))?.text).toContain('no task')
   await ui.unmount()
 
   // Wider panes put two or three to a row; the widths must stay ones the engine accepts.

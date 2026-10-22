@@ -126,30 +126,30 @@ const CSS = `<style>
 .t{fill:#1f1f1f}.s{fill:#4d4d49}.m{fill:#8a8a86}.track{fill:#e7e6e2}.warn{fill:#c0392b}
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.s{fill:#b4b4b0}.m{fill:#7d7d79}.track{fill:#333331}.warn{fill:#ff7a6b}}
 g{transform-box:fill-box}
-.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}
-.run .bd{animation:bob .5s steps(1) infinite -.125s}
+.run .la{animation:st .5s steps(1) infinite var(--ph,0s)}.run .lb{animation:st .5s steps(1) infinite calc(-.25s + var(--ph,0s))}
+.run .bd{animation:bob .5s steps(1) infinite calc(-.125s + var(--ph,0s))}
 @keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}
-.sleep .bd{animation:breathe 3.4s ease-in-out infinite}@keyframes breathe{50%{transform:translateY(1px)}}
-.c-mage.run .la,.c-mage.run .lb,.c-mage.run .bd{animation:none}.c-mage.run{animation:float 1.2s ease-in-out infinite}
-.c-mage.run .orb{animation:glow .6s ease-in-out infinite}.c-mage.run .star{animation:blink .5s steps(1) infinite}
-.c-mage.run .sp1{animation:fly .9s linear infinite}.c-mage.run .sp2{animation:fly .9s linear infinite -.3s}.c-mage.run .sp3{animation:fly .9s linear infinite -.6s}
+.sleep .bd{animation:breathe 3.4s ease-in-out infinite var(--ph,0s)}@keyframes breathe{50%{transform:translateY(1px)}}
+.c-mage.run .la,.c-mage.run .lb,.c-mage.run .bd{animation:none}.c-mage.run{animation:float 1.2s ease-in-out infinite var(--ph,0s)}
+.c-mage.run .orb{animation:glow .6s ease-in-out infinite var(--ph,0s)}.c-mage.run .star{animation:blink .5s steps(1) infinite var(--ph,0s)}
+.c-mage.run .sp1{animation:fly .9s linear infinite var(--ph,0s)}.c-mage.run .sp2{animation:fly .9s linear infinite calc(-.3s + var(--ph,0s))}.c-mage.run .sp3{animation:fly .9s linear infinite calc(-.6s + var(--ph,0s))}
 .sp1,.sp2,.sp3{opacity:0}.c-mage.run .sp1,.c-mage.run .sp2,.c-mage.run .sp3,.c-cleric.run .sp1,.c-cleric.run .sp2{opacity:1}
 @keyframes float{50%{transform:translateY(-2px)}}@keyframes blink{50%{opacity:.2}}@keyframes glow{50%{opacity:.35;transform:scale(1.5)}}
 @keyframes fly{0%{transform:translate(0,3px);opacity:0}30%{opacity:1}100%{transform:translate(3px,-8px);opacity:0}}
-.c-paladin.run .it{transform-origin:50% 100%;animation:slash .6s ease-in-out infinite}.c-paladin.run .gl{animation:blink 1s steps(1) infinite -.5s}
+.c-paladin.run .it{transform-origin:50% 100%;animation:slash .6s ease-in-out infinite var(--ph,0s)}.c-paladin.run .gl{animation:blink 1s steps(1) infinite calc(-.5s + var(--ph,0s))}
 @keyframes slash{50%{transform:rotate(-45deg)}}
-.c-rogue.run .it{transform-origin:100% 100%;animation:twist .5s ease-in-out infinite}@keyframes twist{50%{transform:rotate(-35deg)}}
-.c-cleric.run .pan{transform-origin:0 50%;animation:tilt 1s ease-in-out infinite}.c-cleric.run .halo{animation:glow 1.2s ease-in-out infinite}
-.c-cleric.run .sp1{animation:rise 1.2s linear infinite}.c-cleric.run .sp2{animation:rise 1.2s linear infinite -.6s}
+.c-rogue.run .it{transform-origin:100% 100%;animation:twist .5s ease-in-out infinite var(--ph,0s)}@keyframes twist{50%{transform:rotate(-35deg)}}
+.c-cleric.run .pan{transform-origin:0 50%;animation:tilt 1s ease-in-out infinite var(--ph,0s)}.c-cleric.run .halo{animation:glow 1.2s ease-in-out infinite var(--ph,0s)}
+.c-cleric.run .sp1{animation:rise 1.2s linear infinite var(--ph,0s)}.c-cleric.run .sp2{animation:rise 1.2s linear infinite calc(-.6s + var(--ph,0s))}
 @keyframes tilt{20%,40%{transform:rotate(-12deg)}}@keyframes rise{0%{transform:translateY(4px);opacity:0}40%{opacity:1}100%{transform:translateY(-8px);opacity:0}}
-.c-ranger.run .la{animation-duration:.25s}.c-ranger.run .lb{animation-duration:.25s;animation-delay:-.125s}
-.c-ranger.run .flag{transform-origin:0 50%;animation:wave .25s steps(1) infinite}@keyframes wave{50%{transform:skewY(-12deg) scaleX(.85)}}
-.c-barbarian.run .it{transform-origin:50% 100%;animation:swing .5s ease-in-out infinite}@keyframes swing{50%{transform:rotate(30deg)}}
-.c-king.run .it{transform-origin:50% 100%;animation:decree 1.2s ease-in-out infinite}.c-king.run .star{animation:blink .6s steps(1) infinite}
+.c-ranger.run .la{animation-duration:.25s}.c-ranger.run .lb{animation-duration:.25s;animation-delay:calc(-.125s + var(--ph,0s))}
+.c-ranger.run .flag{transform-origin:0 50%;animation:wave .25s steps(1) infinite var(--ph,0s)}@keyframes wave{50%{transform:skewY(-12deg) scaleX(.85)}}
+.c-barbarian.run .it{transform-origin:50% 100%;animation:swing .5s ease-in-out infinite var(--ph,0s)}@keyframes swing{50%{transform:rotate(30deg)}}
+.c-king.run .it{transform-origin:50% 100%;animation:decree 1.2s ease-in-out infinite var(--ph,0s)}.c-king.run .star{animation:blink .6s steps(1) infinite var(--ph,0s)}
 @keyframes decree{50%{transform:rotate(-14deg)}}
-.z1,.z2,.z3{opacity:0;animation:zz 3.2s ease-in-out infinite}.z2{animation-delay:1s}.z3{animation-delay:2s}
+.z1,.z2,.z3{opacity:0;animation:zz 3.2s ease-in-out infinite var(--ph,0s)}.z2{animation-delay:calc(1s + var(--ph,0s))}.z3{animation-delay:calc(2s + var(--ph,0s))}
 @keyframes zz{0%{opacity:0;transform:translate(0,4px)}25%{opacity:.9}100%{opacity:0;transform:translate(8px,-12px)}}
-.ind{animation:slide 1.4s ease-in-out infinite alternate}@keyframes slide{from{transform:translateX(0)}to{transform:translateX(var(--w))}}
+.ind{animation:slide 1.4s ease-in-out infinite alternate var(--ph,0s)}@keyframes slide{from{transform:translateX(0)}to{transform:translateX(var(--w))}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}
 </style>`
 
@@ -166,6 +166,15 @@ const sprite = (cls: Cls, isAsleep: boolean, x: number, y: number, scale: number
   const state = isAsleep ? 'sleep' : 'run'
   return `<g transform="translate(${x},${y}) scale(${scale})" shape-rendering="crispEdges" opacity="${isAsleep ? 0.62 : 1}"><g class="c-${cls} ${state}">${body}${group('la')}${group('lb')}</g></g>`
 }
+
+// A fixed phase per member, so the knights do not all move in step.
+const phaseOf = (m: Member): string => {
+  let h = 0
+  for (const ch of m.id) h = (h * 31 + ch.charCodeAt(0)) % 4000
+  return `-${(h / 1000).toFixed(2)}s`
+}
+
+const cssFor = (m: Member): string => CSS.split('var(--ph,0s)').join(phaseOf(m))
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const fit = (s: string, n: number): string => (s.length > n ? s.slice(0, Math.max(1, n - 1)).trimEnd() + '…' : s)
@@ -194,16 +203,28 @@ export const timesOf = (m: Member): string => {
   return [steps, times].filter(Boolean).join('  ·  ')
 }
 
-// The knight alone, a fixed 44x40: it never scales with the room around it.
-export const SPRITE_W = 44
-export const SPRITE_H = 40
+// Time in progress and time to complete, shown on their own, only while working.
+export const elapsedOf = (m: Member): string => (m.state === 'working' && m.elapsedMs !== undefined ? fmtDur(m.elapsedMs) : '')
+export const etaOf = (m: Member): string => (m.state === 'working' && m.etaMs !== undefined ? `~${fmtDur(m.etaMs)} left` : '')
 
-export const spriteSvg = (m: Member): string => {
+// The step in progress, or the blocker (shown in red by the caller).
+export const stepOf = (m: Member): string => (m.isBlocked ? `Blocked: ${m.note ?? m.task ?? ''}`.trimEnd() : (m.note ?? ''))
+
+export const WARN = '#c0392b'
+
+// The knight alone, a fixed size on screen: it never scales with the room around it.
+// It is drawn on a 44x40 grid and shown at about twice that.
+export const SPRITE_W = 84
+export const SPRITE_H = 76
+const GRID_W = 44
+const GRID_H = 40
+
+export const spriteSvg = (m: Member, w: number = SPRITE_W, h: number = SPRITE_H): string => {
   const isAsleep = m.state !== 'working'
   const zs = isAsleep
     ? `<text class="m z1" x="30" y="12" font-size="9">z</text><text class="m z2" x="34" y="9" font-size="11">Z</text><text class="m z3" x="40" y="6" font-size="13">Z</text>`
     : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" font-family="Segoe UI, system-ui, sans-serif">${CSS}${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${GRID_W} ${GRID_H}" font-family="Segoe UI, system-ui, sans-serif">${cssFor(m)}${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>`
 }
 
 // The thin progress bar: stretches across whatever width it is given, its height fixed
@@ -214,13 +235,14 @@ export const barSvg = (m: Member): string => {
   const color = ACCENT[m.cls]
   const hasSteps = typeof m.total === 'number' && m.total > 0
   const frac = hasSteps ? Math.min(1, (m.done ?? 0) / (m.total ?? 1)) : 0
-  const track = `<rect class="track" x="0" y="0" width="100" height="${BAR_H}" opacity="${isRun ? 1 : 0.55}"/>`
-  const fill = !isRun
+  const live = isRun || m.isBlocked
+  const track = `<rect class="track" x="0" y="0" width="100" height="${BAR_H}" opacity="${live ? 1 : 0.55}"/>`
+  const fill = !live
     ? ''
     : hasSteps
-      ? `<rect x="0" y="0" width="${Math.max(2, frac * 100).toFixed(1)}" height="${BAR_H}" fill="${color}"/>`
+      ? `<rect x="0" y="0" width="${Math.max(2, frac * 100).toFixed(1)}" height="${BAR_H}" fill="${m.isBlocked ? WARN : color}"/>`
       : `<g class="ind" style="--w:70px"><rect x="0" y="0" width="30" height="${BAR_H}" fill="${color}" opacity=".85"/></g>`
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${BAR_H}" preserveAspectRatio="none">${CSS}${track}${fill}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${BAR_H}" preserveAspectRatio="none">${cssFor(m)}${track}${fill}</svg>`
 }
 
 // The same tile as a page fragment, for the pop-out window (CSS in the page does the layout).
