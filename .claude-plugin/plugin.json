@@ -1,6 +1,6 @@
 {
   "name": "demo-team-roster",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Run Creatio demo builds with a team of parallel chats: the new-demo-team and team-board skills, plus a Team widget with pixel knights that shows who is working, on what, with progress and ETA.",
   "license": "MIT",
   "types": "./types/index.d.ts"

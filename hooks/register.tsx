@@ -152,7 +152,8 @@ const makeTools = ($: any) => {
       const nameOf = (r: { title?: string; name?: string }): string => (r.title ? r.title.split(' (')[0] : (r.name ?? 'helper')) ?? 'helper'
       return {
         orchestrator: { name: 'Lead', id: selfLocal, class: 'king' },
-        members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId, cwd: r.cwd })),
+        // The list is ordered by recent activity; a fixed order (by name) keeps the knights in place.
+        members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId, cwd: r.cwd })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
       }
     } catch {
       return undefined
@@ -583,14 +584,12 @@ export const register: Register = on => {
                       </Text>
                     </Box>
                   </Box>
-                  <Box justifyContent="space-between">
-                    <Text wrap="truncate-end" size="caption" dimColor>
-                      {m.note ?? ' '}
-                    </Text>
-                    <Text size="caption" dimColor>
-                      {timesOf(m) || ' '}
-                    </Text>
-                  </Box>
+                  <Text wrap="truncate-end" size="caption" dimColor>
+                    {m.note ?? ' '}
+                  </Text>
+                  <Text wrap="truncate-end" size="caption" dimColor>
+                    {timesOf(m) || ' '}
+                  </Text>
                 </Box>
               </Box>
             ))}
