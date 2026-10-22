@@ -556,7 +556,7 @@ export const register: Register = on => {
     const rows: Member[][] = []
     for (let i = 0; i < list.length; i += perRow) rows.push(list.slice(i, i + perRow))
     return (
-      <Box flexDirection="column" gap={1}>
+      <Box flexDirection="column">
         {rows.map(row => (
           <Box flexDirection="row">
             {row.map(m => (
@@ -576,20 +576,24 @@ export const register: Register = on => {
                     </Text>
                   </Box>
                   <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
-                  <Box justifyContent="space-between">
-                    <Text size="caption" dimColor>
-                      {elapsedOf(m) || ' '}
-                    </Text>
-                    <Text size="caption" dimColor>
-                      {etaOf(m) || ' '}
-                    </Text>
-                  </Box>
+                  {elapsedOf(m) || etaOf(m) ? (
+                    <Box justifyContent="space-between">
+                      <Text size="caption" dimColor>
+                        {elapsedOf(m) || ' '}
+                      </Text>
+                      <Text size="caption" dimColor>
+                        {etaOf(m) || ' '}
+                      </Text>
+                    </Box>
+                  ) : null}
                   <Text wrap="truncate-end" size="caption" dimColor={m.state !== 'working'}>
                     {m.task ?? (m.state === 'working' ? 'working…' : 'no task')}
                   </Text>
-                  <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
-                    {stepOf(m) || ' '}
-                  </Text>
+                  {stepOf(m) ? (
+                    <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
+                      {stepOf(m)}
+                    </Text>
+                  ) : null}
                 </Box>
               </Box>
             ))}
