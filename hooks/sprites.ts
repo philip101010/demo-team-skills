@@ -190,9 +190,9 @@ export const fmtDur = (ms: number): string => {
 
 export const statusOf = (m: Member): string => (m.state === 'working' ? 'working' : m.isBlocked ? '! blocked' : 'idling')
 
-// Completion as a small number for the bar: only while working and steps are reported.
+// Completion as a small number for the bar: while working or blocked, and steps are reported.
 export const pctOf = (m: Member): string =>
-  m.state === 'working' && typeof m.total === 'number' && m.total > 0 ? `${Math.min(100, Math.round(((m.done ?? 0) / m.total) * 100))}%` : ''
+  (m.state === 'working' || m.isBlocked) && typeof m.total === 'number' && m.total > 0 ? `${Math.min(100, Math.round(((m.done ?? 0) / m.total) * 100))}%` : ''
 
 export const timesOf = (m: Member): string => {
   const steps = typeof m.total === 'number' && m.total > 0 ? `${m.done ?? 0}/${m.total}` : ''

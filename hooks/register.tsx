@@ -27,7 +27,6 @@ const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => 
 const members = atom({ plugin: 'demo-team-roster', key: 'members' } as const, [] as Member[])
 const since = atom({ plugin: 'demo-team-roster', key: 'since' } as const, {} as Record<string, number>)
 const isOrch = atom({ plugin: 'demo-team-roster', key: 'isOrchestrator' } as const, false)
-const debug = atom({ plugin: 'demo-team-roster', key: 'debug' } as const, '')
 
 type RosterEntry = { name: string; id: string; class?: string; cwd?: string }
 type RosterFile = { orchestrator?: RosterEntry; members?: RosterEntry[] }
@@ -366,9 +365,8 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor, diag } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor } = makeTools($)
     let wasOpened = false
-    let polls = 0
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
     const poll = async (): Promise<void> => {
@@ -390,11 +388,9 @@ export const register: Register = on => {
         const started = await read($, since)
         const nextSince: Record<string, number> = { ...started }
         const out: Member[] = []
-        let metaFound = 0
         for (const entry of entries) {
           const file = await findMeta(entry.id)
           const meta = file ? await readJson<SessionMeta>(file) : undefined
-          if (meta) metaFound += 1
           let isRun = running ? running.has(entry.id) : false
           if (!running && meta?.cliSessionId && meta.cwd) {
             // Fallback: the transcript was written to a moment ago.
@@ -433,9 +429,6 @@ export const register: Register = on => {
           })
         }
         await update($, members, () => out)
-        polls += 1
-        const withBar = out.filter(m => typeof m.total === 'number').length
-        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar} · meta ${metaFound}/${entries.length}${diag.listError ? ` · list error: ${diag.listError}` : ''}${diag.metaError ? ` · meta error: ${diag.metaError}` : ''}`)
         await update($, since, () => nextSince)
         // The team is watched by the orchestrator and by any other chat in the project folder that is
         // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
@@ -543,7 +536,6 @@ export const register: Register = on => {
         </Box>
       )
     }
-    const working = list.filter(m => m.state === 'working').length
     // The tile is as wide as the narrowest the pane can be. The pane's minimum is learned:
     // the smallest body width ever drawn is kept across sessions (a guess until then).
     const cols = Number((e.props as { bodyColumns?: number }).bodyColumns ?? e.viewport?.columns ?? 0)
@@ -574,12 +566,6 @@ export const register: Register = on => {
             ))}
           </Box>
         ))}
-        <Text dimColor size="caption">
-          {working} working, {list.length - working} idling · {cols} cols, min {minCols}, {perRow} per row
-        </Text>
-        <Text dimColor size="caption">
-          {(await read($, debug)) || 'no poll yet'}
-        </Text>
       </Box>
     )
   })
