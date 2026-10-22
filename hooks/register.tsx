@@ -25,6 +25,7 @@ const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => 
 const members = atom({ plugin: 'demo-team-roster', key: 'members' } as const, [] as Member[])
 const since = atom({ plugin: 'demo-team-roster', key: 'since' } as const, {} as Record<string, number>)
 const isOrch = atom({ plugin: 'demo-team-roster', key: 'isOrchestrator' } as const, false)
+const debug = atom({ plugin: 'demo-team-roster', key: 'debug' } as const, '')
 
 type RosterEntry = { name: string; id: string; class?: string }
 type RosterFile = { orchestrator?: RosterEntry; members?: RosterEntry[] }
@@ -347,6 +348,7 @@ export const register: Register = on => {
 
     const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor } = makeTools($)
     let wasOpened = false
+    let polls = 0
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
     const poll = async (): Promise<void> => {
@@ -354,7 +356,9 @@ export const register: Register = on => {
         const cwd = await $.session.cwd()
         const selfCli = await $.session.id()
         const projectDir = await findRosterDir(cwd, selfCli)
-        const roster = (projectDir ? await readJson<RosterFile>([projectDir, '_orchestration', 'roster.json'].join(sep)) : undefined) ?? (await linkedRoster())
+        const fileRoster = projectDir ? await readJson<RosterFile>([projectDir, '_orchestration', 'roster.json'].join(sep)) : undefined
+        const fromFile = !!fileRoster
+        const roster = fileRoster ?? (await linkedRoster())
         if (!roster) {
           await update($, members, () => [])
           return
@@ -407,6 +411,9 @@ export const register: Register = on => {
           })
         }
         await update($, members, () => out)
+        polls += 1
+        const withBar = out.filter(m => typeof m.total === 'number').length
+        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar}`)
         await update($, since, () => nextSince)
         // The team is watched by the orchestrator and by any other chat in the project folder that is
         // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
@@ -563,6 +570,9 @@ export const register: Register = on => {
         ))}
         <Text dimColor size="caption">
           {working} working, {list.length - working} idling · {cols} cols, min {minCols}, {perRow} per row
+        </Text>
+        <Text dimColor size="caption">
+          {(await read($, debug)) || 'no poll yet'}
         </Text>
       </Box>
     )
