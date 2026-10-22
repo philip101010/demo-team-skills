@@ -245,6 +245,49 @@ export const barSvg = (m: Member): string => {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${BAR_H}" preserveAspectRatio="none">${cssFor(m)}${track}${fill}</svg>`
 }
 
+// The whole card as one drawing: border, knight, name, bar and four rows of text, laid out in pixels
+// (the pane's own text rows are taller than a card wants). Long text is cut by hand, there being no
+// way to measure it here. Empty values are a dash, so the card never changes shape.
+export const CARD_W = 300
+export const CARD_H = 92
+const DASH = '—'
+const CARD_CSS = `<style>.cb{fill:none;stroke:#d9d8d3}.hl{font-weight:600}@media (prefers-color-scheme: dark){.cb{stroke:#3d3d3a}}</style>`
+
+export const cardSvg = (m: Member): string => {
+  const isRun = m.state === 'working'
+  const isAsleep = !isRun
+  const color = ACCENT[m.cls]
+  const x0 = 84
+  const x1 = CARD_W - 12
+  const barW = x1 - x0
+  const hasSteps = typeof m.total === 'number' && m.total > 0
+  const frac = hasSteps ? Math.min(1, (m.done ?? 0) / (m.total ?? 1)) : 0
+  const live = isRun || m.isBlocked
+  const zs = isAsleep
+    ? `<text class="m z1" x="30" y="12" font-size="9">z</text><text class="m z2" x="34" y="9" font-size="11">Z</text><text class="m z3" x="40" y="6" font-size="13">Z</text>`
+    : ''
+  const fill = !live
+    ? ''
+    : hasSteps
+      ? `<rect x="${x0}" y="27" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
+      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="27" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
+  const text = (cls: string, x: number, y: number, s: string, anchor = 'start'): string =>
+    `<text class="${cls}" x="${x}" y="${y}" font-size="11" text-anchor="${anchor}">${esc(s)}</text>`
+  const task = m.task ?? (isRun ? 'working…' : DASH)
+  const step = stepOf(m) || DASH
+  const badge = m.isBlocked ? `<circle cx="70" cy="16" r="8" fill="${WARN}"/><text x="70" y="20" font-size="11" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}" font-family="Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}
+<defs><clipPath id="bar"><rect x="${x0}" y="27" width="${barW}" height="6" rx="3"/></clipPath></defs>
+<rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${CARD_H - 1}" rx="12"/>
+<svg x="10" y="17" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
+<rect class="track" x="${x0}" y="27" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
+${text('t hl', x0, 21, fit(m.name, 24))}${text('s', x1, 21, pctOf(m) || DASH, 'end')}
+${text('s', x0, 47, elapsedOf(m) || DASH)}${text('s', x1, 47, etaOf(m) || DASH, 'end')}
+${text(isRun ? 't' : 'm', x0, 63, fit(task, 34))}
+${text(m.isBlocked ? 'warn' : 's', x0, 79, fit(step, 34))}
+</svg>`
+}
+
 // The same tile as a page fragment, for the pop-out window (CSS in the page does the layout).
 export const tileHtml = (m: Member): string => {
   const isRun = m.state === 'working'

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { Member } from '../types'
-import { BAR_H, SPRITE_H, SPRITE_W, WARN, barSvg, classOf, elapsedOf, etaOf, pctOf, spriteSvg, statusOf, stepOf } from './sprites'
+import { cardSvg, classOf, pctOf, statusOf, stepOf } from './sprites'
 
 const PANE = 'demo-team-roster'
 // Cells across the narrowest the pane can be, until the real one has been seen.
@@ -563,38 +563,13 @@ export const register: Register = on => {
           <Box flexDirection="row">
             {row.map(m => (
               <Box width={width}>
-                <Box flexGrow={1} flexDirection="row" gap={1} alignItems="center" borderStyle="round" borderColor="promptBorder" paddingX={1}>
-                  {Svg ? (
-                    <Svg source={spriteSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}`} width={SPRITE_W} height={SPRITE_H} />
-                  ) : (
-                    <Text>{m.state === 'working' ? '>' : 'z'}</Text>
-                  )}
-                  <Box flexDirection="column" flexGrow={1}>
-                    <Box justifyContent="space-between">
-                      <Text weight="semibold" size="caption">
-                        {m.name}
-                      </Text>
-                      <Text size="caption" dimColor>
-                        {pctOf(m) || EMPTY}
-                      </Text>
-                    </Box>
-                    <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
-                    <Box justifyContent="space-between">
-                      <Text size="caption" dimColor>
-                        {elapsedOf(m) || EMPTY}
-                      </Text>
-                      <Text size="caption" dimColor>
-                        {etaOf(m) || EMPTY}
-                      </Text>
-                    </Box>
-                    <Text wrap="truncate-end" size="caption" dimColor={m.state !== 'working'}>
-                      {m.task ?? (m.state === 'working' ? 'working…' : EMPTY)}
-                    </Text>
-                    <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
-                      {stepOf(m) || EMPTY}
-                    </Text>
-                  </Box>
-                </Box>
+                {Svg ? (
+                  <Svg source={cardSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}. ${pctOf(m)} ${m.task ?? ''} ${stepOf(m)}`.trim()} />
+                ) : (
+                  <Text wrap="truncate-end">
+                    {m.state === 'working' ? '>' : 'z'} {m.name} {pctOf(m) || EMPTY} {m.task ?? EMPTY}
+                  </Text>
+                )}
               </Box>
             ))}
           </Box>

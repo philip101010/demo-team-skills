@@ -36,10 +36,12 @@ test('without a roster file the pane lists the chats this chat started', async (
   await $.session.start({ cwd: 'C:\work', surface: 'desktop', isInteractive: true })
   await new Promise(r => setTimeout(r, 200))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /Kei/ }))?.text).toBe('Kei')
+  const cards = (await ui.findAll({ type: 'Svg' })).map(c => ({ alt: String(c.props.alt), source: String(c.props.source) }))
+  // The lead and the one helper this chat started; the other chats of the list are not in the team.
+  expect(cards.length).toBe(2)
+  const kei = cards.find(c => c.source.includes('>Kei<'))
+  expect(kei).toBeDefined()
   // Kei is running in the same list, so no second call is needed to know it.
-  expect(await ui.find({ type: 'Text', text: /working/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Other/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /Old/ })).toBeUndefined()
+  expect(kei?.alt.includes('working')).toBe(true)
   await ui.unmount()
 })
