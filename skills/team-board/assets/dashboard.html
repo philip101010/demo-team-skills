@@ -1,72 +1,82 @@
 <title>Demo Team Roster</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: a switch and a live indicator over one card per project; a project card holds a card per agent (the same drawing the Team pane uses) beside its roadmap.
-   Look: the app's own card style: quiet cool neutrals, hairline borders, large radii, clay accent used once, semantic green and red for state. */
+/* Layout: masthead (title, Watching / Stopped switch) over a desk of project files; each file is a paper form holding a card per agent beside its roadmap.
+   Look: the Quest Board's Papers, Please desk: olive-black with faint scanlines, bone lines, amber accent, system font, bright paper forms with form headers, labelled fields and stamps.
+   The agents are the Team pane's own cards, drawn in the same palette. */
 :root{
-  --bg:#F1F2F4; --surface:#FFFFFF; --surface-2:#F6F7F8; --ink:#1D1E21; --muted:#6B6E76; --line:#DCDEE3;
-  --accent:#D97757; --on-accent:#FFFFFF; --good:#2F7D4F; --bad:#C0392B; --track:#E7E8EC;
+  --bg:#11150F; --bg-glow:#1D251A; --ink:#E4E0C6; --muted:#9AA086; --paper:#1B2117; --doc:#232B1E;
+  --accent:#E8A33D; --on-accent:#11150F; --line:#4A5236; --shadow:#050703;
+  --hi:rgba(228,224,198,.2); --lo:rgba(0,0,0,.5); --scan:rgba(0,0,0,.3);
+  --red:#C93B2C; --on-red:#FFF1E2; --green:#6FA84A; --on-green:#12200A; --stamp-ok:#8FD67A; --stamp-bad:#FF7A6B; --blend:normal;
   --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  color-scheme:light;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#141517; --surface:#1E1F22; --surface-2:#26272B; --ink:#ECECEE; --muted:#9A9DA6; --line:#34363B;
-  --accent:#E08A6B; --on-accent:#1E1F22; --good:#6FCF97; --bad:#FF7A6B; --track:#33353A; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#141517; --surface:#1E1F22; --surface-2:#26272B; --ink:#ECECEE; --muted:#9A9DA6; --line:#34363B;
-  --accent:#E08A6B; --on-accent:#1E1F22; --good:#6FCF97; --bad:#FF7A6B; --track:#33353A; color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#E7D9BF; --bg-glow:#F6EEDC; --ink:#2A1620; --muted:#7A6A5C; --paper:#FBF5E6; --doc:#EFE6C8;
+  --accent:#E8A33D; --on-accent:#2A1620; --line:#B9A88B; --shadow:#2A1620;
+  --hi:rgba(255,255,255,.6); --lo:rgba(42,22,32,.3); --scan:rgba(42,22,32,.07);
+  --stamp-ok:#2F6B2A; --stamp-bad:#B3261E; --blend:multiply; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#E7D9BF; --bg-glow:#F6EEDC; --ink:#2A1620; --muted:#7A6A5C; --paper:#FBF5E6; --doc:#EFE6C8;
+  --accent:#E8A33D; --on-accent:#2A1620; --line:#B9A88B; --shadow:#2A1620;
+  --hi:rgba(255,255,255,.6); --lo:rgba(42,22,32,.3); --scan:rgba(42,22,32,.07);
+  --stamp-ok:#2F6B2A; --stamp-bad:#B3261E; --blend:multiply; color-scheme:light}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px;min-height:100%}
+body{background-color:var(--bg);background-image:radial-gradient(ellipse 80% 60% at 50% 25%,var(--bg-glow) 0,var(--bg) 70%);background-attachment:fixed;
+  color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px;min-height:100%}
+body::before{content:"";position:fixed;inset:0;z-index:49;pointer-events:none;background:repeating-linear-gradient(0deg,var(--scan) 0 1px,transparent 1px 3px);opacity:.55}
 button{font:inherit;color:inherit;cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.page,.stack{max-width:1040px;margin:0 auto;display:grid;gap:16px;width:100%}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.page,.stack{max-width:1000px;margin:0 auto;display:grid;gap:20px;position:relative;z-index:1;width:100%}
 
-.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 14px}
-.sw{position:relative;display:grid;grid-template-columns:1fr 1fr;min-width:240px;padding:3px;font-weight:500;font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:999px}
-.sw .thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);background:var(--ink);border-radius:999px;transition:transform .18s ease}
+.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 12px}
+.sw{position:relative;display:grid;grid-template-columns:1fr 1fr;min-width:230px;padding:0;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border:2px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo)}
+.sw .thumb{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);background:var(--accent);border:2px solid var(--ink);transition:transform .15s steps(3)}
 .sw.on .thumb{transform:translateX(100%)}
-.sw .opt{position:relative;z-index:1;padding:6px 14px;text-align:center;color:var(--muted)}
+.sw .opt{position:relative;z-index:1;padding:6px 12px;text-align:center}
 .sw .opt span{margin-left:6px;opacity:.8}
-.sw:not(.on) .opt-a,.sw.on .opt-b{color:var(--bg)}
+.sw:not(.on) .opt-a,.sw.on .opt-b{color:var(--on-accent)}
 .top .right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.stampline{font-size:13px;color:var(--muted)}
-.stampline.live{color:var(--good)}
-.stampline.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:1px}
-.btn{font-weight:500;font-size:14px;padding:6px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
-.btn:hover{border-color:var(--muted)}
-.btn:active{transform:scale(.98)}
+.stampline.live{color:var(--stamp-ok)}
+.stampline{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.btn{font-weight:600;font-size:14px;padding:5px 12px;background:var(--paper);border:2px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo),3px 3px 0 var(--shadow)}
+.btn:hover{filter:brightness(1.15)}
+.btn:active{transform:translate(2px,2px);box-shadow:inset -2px -2px 0 var(--hi),inset 2px 2px 0 var(--lo),1px 1px 0 var(--shadow)}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--ink)}
 
-.file{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:14px;min-width:0}
-.fname{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 12px}
-.fname h2{margin:0;font-size:18px;font-weight:600;text-wrap:balance}
-.fname .meta{font-size:13px;color:var(--muted);margin-top:2px}
+.file{background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo),5px 5px 0 var(--shadow);padding:12px;display:grid;gap:12px;min-width:0}
+.file+.file{margin-top:4px}
+.fname{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 12px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.fname h2{margin:0;font-size:19px;font-weight:700;text-wrap:balance}
+.fname .meta{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
 .fname .right{display:flex;align-items:center;gap:10px}
-.mini{width:70px;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.mini{width:70px;height:10px;border:2px solid var(--ink);background:var(--line);overflow:hidden}
 .mini i{display:block;height:100%;background:var(--accent)}
-.cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(240px,1fr);gap:20px 28px;align-items:start}
+.cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);gap:20px 28px;align-items:start}
 @media (max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
 .members{display:grid;grid-template-columns:repeat(auto-fill,minmax(264px,1fr));gap:0 12px;align-content:start}
 .mc{min-width:0}
 .mc img{display:block;width:100%;height:auto;max-width:360px}
-.road{display:grid;gap:6px;min-width:0;align-content:start}
-.road h3{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
-.rsum{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:4px}
-.rbar{height:6px;border-radius:3px;background:var(--track);overflow:hidden}
-.rbar i{display:block;height:100%;background:var(--good)}
-.tk{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:var(--surface-2)}
-.tk .dot{width:8px;height:8px;border-radius:50%;background:var(--line);margin-top:6px}
-.tk.s-working .dot{background:var(--good)} .tk.s-paused .dot{background:var(--bad)} .tk.s-done{opacity:.6}
-.tid{font-size:12px;font-weight:600;color:var(--muted);margin-right:6px}
+.road{display:grid;gap:8px;min-width:0;align-content:start}
+.road h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px dotted var(--muted);padding-bottom:3px}
+.rsum{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.rbar{height:4px;background:var(--line);overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--stamp-ok)}
+.t{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 8px;padding:5px 0 5px 8px;border-left:3px solid var(--line);font-size:14px}
+.t.s-working{border-left-color:var(--stamp-ok)} .t.s-paused{border-left-color:var(--stamp-bad)} .t.s-done{opacity:.6}
+.tid{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);align-self:baseline;white-space:nowrap}
 .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tm{grid-column:2;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.road details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
-.road details[open] summary{margin-bottom:6px}
-.road details[open]{display:grid;gap:6px}
+.road details summary{cursor:pointer;font-size:12px;color:var(--muted);padding:4px 0}
+.road details[open] summary{margin-bottom:2px}
 .none{font-size:13px;color:var(--muted)}
-.empty{text-align:center;padding:36px 16px;background:var(--surface);border:1px dashed var(--line);border-radius:16px}
-.empty .big{font-size:18px;font-weight:600;margin:0 0 4px}
+.stop{font-size:13px;padding:3px 10px;color:var(--muted);border:2px solid var(--line);background:transparent;box-shadow:none}
+.stop:hover{color:var(--ink);border-color:var(--ink)}
+.empty{text-align:center;padding:28px 16px;background:var(--paper);border:3px dashed var(--ink)}
+.empty .big{font-size:20px;font-weight:700;margin:0 0 4px}
 .empty p{margin:4px 0;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.sw .thumb{transition:none}}
 </style>
@@ -331,10 +341,12 @@ const barSvg = (m        )         => {
 const CARD_W = 264
 const CARD_H = 94
 const CARD_GAP = 10
+// The dashboard's own palette (olive and bone, square corners), drawn over the same card.
+const RETRO_CSS = `<style>.cb{stroke:#4A5236;stroke-width:2}.t{fill:#E4E0C6}.s{fill:#C5C2A6}.m{fill:#9AA086}.track{fill:#323A28}.warn{fill:#FF7A6B}@media (prefers-color-scheme: light){.cb{stroke:#B9A88B}.t{fill:#2A1620}.s{fill:#5C4A52}.m{fill:#7A6A5C}.track{fill:#E0D4B5}.warn{fill:#B3261E}}</style>`
 const DASH = '—'
 const CARD_CSS = `<style>.cb{fill:none;stroke:#d9d8d3}.hl{font-weight:600}@media (prefers-color-scheme: dark){.cb{stroke:#3d3d3a}}</style>`
 
-const cardSvg = (m        )         => {
+const cardSvg = (m        , isRetro = false)         => {
   const isRun = m.state === 'working'
   const isAsleep = !isRun
   const color = ACCENT[m.cls]
@@ -357,11 +369,11 @@ const cardSvg = (m        )         => {
   const task = m.task ?? (isRun ? 'working…' : DASH)
   const step = stepOf(m) || DASH
   const badge = m.isBlocked ? `<circle cx="78" cy="16" r="8" fill="${WARN}"/><text x="78" y="20" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${CARD_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}
-<defs><clipPath id="bar"><rect x="${x0}" y="28" width="${barW}" height="6" rx="3"/></clipPath></defs>
-<rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${CARD_H - 1}" rx="12"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${CARD_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}${isRetro ? RETRO_CSS : ''}
+<defs><clipPath id="bar"><rect x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}"/></clipPath></defs>
+<rect class="cb" x="${isRetro ? 1 : 0.5}" y="${isRetro ? 1 : 0.5}" width="${CARD_W - (isRetro ? 2 : 1)}" height="${CARD_H - (isRetro ? 2 : 1)}" rx="${isRetro ? 0 : 12}"/>
 <svg x="12" y="16" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
-<rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
+<rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}" opacity="${live ? 1 : 0.55}"/>${fill}
 ${text('t hl', x0, 22, fit(m.name, 18))}${text('s', x1, 22, pctOf(m) || DASH, 'end')}
 ${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
 ${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
@@ -392,13 +404,13 @@ const tileHtml = (m        )         => {
     elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, role:m.role }; }
   // The card is the Team pane's own drawing, shown as an image so its styles stay inside it.
   function memberHtml(raw){
-    var m = norm(raw), svg = cardSvg(m);
+    var m = norm(raw), svg = cardSvg(m, true);
     return '<div class="mc"><img alt="'+esc(m.name+', '+statusOf(m))+'" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'"></div>';
   }
   var RANK = {working:0, paused:1, queued:2, unknown:3, done:4};
   function taskHtml(t){
-    var meta=[t.performer, t.priority, t.depends?'after '+t.depends:''].filter(Boolean).join(' · ');
-    return '<div class="tk s-'+esc(t.status)+'"><span class="dot"></span><span class="tt" title="'+esc(t.title)+'"><span class="tid">'+esc(t.id)+'</span>'+esc(t.title)+'</span>'+(meta?'<span class="tm">'+esc(meta)+'</span>':'')+'</div>';
+    var meta=[t.performer, t.priority, t.depends?'after '+t.depends:''].filter(Boolean).join(' \u00b7 ');
+    return '<div class="t s-'+esc(t.status)+'"><span class="tid">'+esc(t.id)+'</span><span class="tt" title="'+esc(t.title)+'">'+esc(t.title)+'</span>'+(meta?'<span class="tm">'+esc(meta)+'</span>':'')+'</div>';
   }
   function roadPct(p){ var ts=p.tasks||[]; return ts.length ? Math.round(ts.filter(function(t){return t.status==='done'}).length/ts.length*100) : 0; }
   function roadHtml(p){
@@ -437,7 +449,7 @@ const tileHtml = (m        )         => {
       out += '<section class="file" data-slug="'+esc(p.slug)+'"><div class="fname"><div><h2>'+esc(p.name)+'</h2><div class="meta">'+
         p.working+' of '+p.members.length+' working · updated '+ago(p.generatedAt)+'</div></div><div class="right">'+
         (showStopped ? '' : '<span class="mini" title="Roadmap '+roadPct(p)+'% done"><i style="width:'+roadPct(p)+'%"></i></span>')+
-        '<button class="btn" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
+        '<button class="btn stop" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
         (showStopped ? '' : '<div class="cols"><div class="members">'+p.members.map(memberHtml).join('')+'</div>'+roadHtml(p)+'</div>')+'</section>';
     });
     $('main').innerHTML = out;
