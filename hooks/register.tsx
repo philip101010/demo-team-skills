@@ -11,7 +11,7 @@ const POLL_MS = 4000
 const STEP_TOOL = 'mcp__demo-team-roster__roster_step'
 const SNAP_TOOL = 'mcp__demo-team-roster__team_snapshot'
 const PROGRESS_RULE =
-  'This project has a team roster (_orchestration/roster.json) that a Team widget and a dashboard show live. When the roster_step tool is available, report your own progress with it: call it when you start a task (task = short title, done = 0, total = the number of steps you plan) and after each finished step (done, note = what you do next). Skip it for one-step work.'
+  'This project has a team roster (_orchestration/roster.json) that a Team widget and a dashboard show live. Report your own progress with the roster_step tool. It is a deferred tool: load its schema first with ToolSearch (query "select:mcp__demo-team-roster__roster_step"), then call it when you start a task (task = short title, done = 0, total = the number of steps you plan) and after each finished step (done, note = what you do next). Do this before your first real action on a task. Skip it only for one-step work.'
 const LIST_TOOL = 'mcp__ccd_session_mgmt__list_sessions'
 const SNAP_STATUS: Record<string, string[]> = {
   done: ['done', 'виконано', 'готово'],
