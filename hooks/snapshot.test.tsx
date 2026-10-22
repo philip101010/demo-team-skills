@@ -28,7 +28,8 @@ test('team_snapshot returns every project with its members and tasks', async ($,
         ? [{ kind: 'directory', name: 'Proj One', mtimeMs: 0 }]
         : []) as never,
   }))
-  on('fs.exists', () => ({ value: false }))
+  on('fs.exists', (_, e: any) => ({ value: String(e.path).endsWith('roster.json') }))
+  on('prompt.compose', () => ({ sections: [] }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
   on('tool.call', () => ({ result: { text: '[]' } }))
 
@@ -40,5 +41,7 @@ test('team_snapshot returns every project with its members and tasks', async ($,
   expect(snap.projects[0]?.members.map(m => m.name)).toEqual(['Merlin TL', 'Gareth'])
   expect(snap.projects[0]?.members[1]?.total).toBe(1)
   expect(snap.projects[0]?.tasks[0]).toMatchObject({ id: 'T-11', status: 'working', depends: 'T-10' })
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: ['desktop'], tools: [], outputStyle: null, traits: [] } as never)
+  expect(composed.sections.map(sec => sec.id)).toContain('demo-team-roster:progress')
   await new Promise(r => setTimeout(r, 300)) // let the poll's own pane open settle
 })
