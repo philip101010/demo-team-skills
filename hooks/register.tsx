@@ -70,6 +70,7 @@ const makeTools = ($: any) => {
   const metaPaths = new Map<string, string>()
   const taskCache = new Map<string, { mtime: number; id: string; title: string; status: string; performer: string; priority: string; depends: string }>()
   let canList = true
+  let listFailedAt = 0
 
   const readJson = async <T,>(path: string): Promise<T | undefined> => {
     try {
@@ -102,14 +103,21 @@ const makeTools = ($: any) => {
     return undefined
   }
 
+  // A failed call is not forever: try again after a while (the tool may not be ready at start).
+  const diag = { listError: '' }
   const runningIds = async (): Promise<Set<string> | undefined> => {
-    if (!canList) return undefined
+    const now = Number(await $.clock.now())
+    if (!canList && now - listFailedAt < 20000) return undefined
     try {
       const res = await $.tool.call({ tool: LIST_TOOL, limit: 100 } as never)
       const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; isRunning?: boolean }[]
+      canList = true
+      diag.listError = ''
       return new Set(rows.filter(r => r.isRunning).map(r => r.sessionId))
-    } catch {
+    } catch (error) {
       canList = false
+      listFailedAt = now
+      diag.listError = String((error as Error)?.message ?? error).slice(0, 60)
       return undefined
     }
   }
@@ -319,7 +327,7 @@ const makeTools = ($: any) => {
     }
     return { generatedAt: now, projects }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, snapshot }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, snapshot, diag }
 }
 
 export const register: Register = on => {
@@ -346,7 +354,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, diag } = makeTools($)
     let wasOpened = false
     let polls = 0
     const closedKey = (cwd: string): string => `closed:${cwd}`
@@ -370,9 +378,11 @@ export const register: Register = on => {
         const started = await read($, since)
         const nextSince: Record<string, number> = { ...started }
         const out: Member[] = []
+        let metaFound = 0
         for (const entry of entries) {
           const file = await findMeta(entry.id)
           const meta = file ? await readJson<SessionMeta>(file) : undefined
+          if (meta) metaFound += 1
           let isRun = running ? running.has(entry.id) : false
           if (!running && meta?.cliSessionId && meta.cwd) {
             // Fallback: the transcript was written to a moment ago.
@@ -413,7 +423,7 @@ export const register: Register = on => {
         await update($, members, () => out)
         polls += 1
         const withBar = out.filter(m => typeof m.total === 'number').length
-        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar}`)
+        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar} · meta ${metaFound}/${entries.length}${diag.listError ? ` · list error: ${diag.listError}` : ''}`)
         await update($, since, () => nextSince)
         // The team is watched by the orchestrator and by any other chat in the project folder that is
         // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
