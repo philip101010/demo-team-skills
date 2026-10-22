@@ -23,6 +23,8 @@ declare module 'claude-code' {
       since: Record<string, number>
       /** True in the chat that watches the roster (the orchestrator), false in the listed helpers. */
       isOrchestrator: boolean
+      /** One line about the last poll, shown at the bottom of the pane. */
+      debug: string
     }
   }
 }
