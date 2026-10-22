@@ -214,8 +214,8 @@ export const WARN = '#c0392b'
 
 // The knight alone, a fixed size on screen: it never scales with the room around it.
 // It is drawn on a 44x40 grid and shown at about one and a half times that.
-export const SPRITE_W = 64
-export const SPRITE_H = 58
+export const SPRITE_W = 68
+export const SPRITE_H = 62
 const GRID_W = 44
 const GRID_H = 40
 
@@ -248,8 +248,8 @@ export const barSvg = (m: Member): string => {
 // The whole card as one drawing: border, knight, name, bar and four rows of text, laid out in pixels
 // (the pane's own text rows are taller than a card wants). Long text is cut by hand, there being no
 // way to measure it here. Empty values are a dash, so the card never changes shape.
-export const CARD_W = 300
-export const CARD_H = 92
+export const CARD_W = 280
+export const CARD_H = 104
 const DASH = '—'
 const CARD_CSS = `<style>.cb{fill:none;stroke:#d9d8d3}.hl{font-weight:600}@media (prefers-color-scheme: dark){.cb{stroke:#3d3d3a}}</style>`
 
@@ -257,7 +257,7 @@ export const cardSvg = (m: Member): string => {
   const isRun = m.state === 'working'
   const isAsleep = !isRun
   const color = ACCENT[m.cls]
-  const x0 = 84
+  const x0 = 92
   const x1 = CARD_W - 12
   const barW = x1 - x0
   const hasSteps = typeof m.total === 'number' && m.total > 0
@@ -269,22 +269,22 @@ export const cardSvg = (m: Member): string => {
   const fill = !live
     ? ''
     : hasSteps
-      ? `<rect x="${x0}" y="27" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
-      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="27" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
+      ? `<rect x="${x0}" y="32" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
+      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="32" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
   const text = (cls: string, x: number, y: number, s: string, anchor = 'start'): string =>
-    `<text class="${cls}" x="${x}" y="${y}" font-size="11" text-anchor="${anchor}">${esc(s)}</text>`
+    `<text class="${cls}" x="${x}" y="${y}" font-size="12" text-anchor="${anchor}">${esc(s)}</text>`
   const task = m.task ?? (isRun ? 'working…' : DASH)
   const step = stepOf(m) || DASH
-  const badge = m.isBlocked ? `<circle cx="70" cy="16" r="8" fill="${WARN}"/><text x="70" y="20" font-size="11" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
+  const badge = m.isBlocked ? `<circle cx="78" cy="21" r="8" fill="${WARN}"/><text x="78" y="25" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}" font-family="Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}
-<defs><clipPath id="bar"><rect x="${x0}" y="27" width="${barW}" height="6" rx="3"/></clipPath></defs>
+<defs><clipPath id="bar"><rect x="${x0}" y="32" width="${barW}" height="6" rx="3"/></clipPath></defs>
 <rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${CARD_H - 1}" rx="12"/>
-<svg x="10" y="17" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
-<rect class="track" x="${x0}" y="27" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
-${text('t hl', x0, 21, fit(m.name, 24))}${text('s', x1, 21, pctOf(m) || DASH, 'end')}
-${text('s', x0, 47, elapsedOf(m) || DASH)}${text('s', x1, 47, etaOf(m) || DASH, 'end')}
-${text(isRun ? 't' : 'm', x0, 63, fit(task, 34))}
-${text(m.isBlocked ? 'warn' : 's', x0, 79, fit(step, 34))}
+<svg x="12" y="21" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
+<rect class="track" x="${x0}" y="32" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
+${text('t hl', x0, 25, fit(m.name, 20))}${text('s', x1, 25, pctOf(m) || DASH, 'end')}
+${text('s', x0, 58, elapsedOf(m) || DASH)}${text('s', x1, 58, etaOf(m) || DASH, 'end')}
+${text(isRun ? 't' : 'm', x0, 75, fit(task, 28))}
+${text(m.isBlocked ? 'warn' : 's', x0, 92, fit(step, 28))}
 </svg>`
 }
 
