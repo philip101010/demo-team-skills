@@ -21,10 +21,10 @@ Reply in the user's language. Files and commands stay in English.
 ## Steps
 
 0. First run only. Publish `<skill dir>/assets/dashboard.html` with the Artifact tool: `capabilities: {"db": {}}`, title "Demo Team Roster", icon `dashboard`, a one-sentence description. Save the returned URL as `{"boardUrl": "<url>"}` in `~/.claude/demo-team-roster/config.json` (create the folder). The board is private to the user; sharing is theirs to do from the Share menu.
-1. Collect the project document(s) into the scratchpad, never into the project folder:
+1. Find who is running right now: call `list_sessions` (the session management tool), take the ids with `isRunning: true`, and drop your own session id (`get_session` with `self`): you are running only because of this command, and you will be idle when it ends. Then collect the project document(s) into the scratchpad, never into the project folder:
 
    ```
-   python -I "<skill dir>/scripts/collect.py" --project "<project folder>" --outdir "<scratchpad>/board"
+   python -I "<skill dir>/scripts/collect.py" --project "<project folder>" --running "<id1,id2 or none>" --outdir "<scratchpad>/board"
    ```
 
    Leave out `--project` for `all`. It prints one slug per project and exits 3 when no roster matched.
@@ -39,5 +39,5 @@ Reply in the user's language. Files and commands stay in English.
 ## Notes
 
 - A project the user stopped watching returns only when they name it, and then it is revived (step 2).
-- "Working" is judged from the session's activity in the last 90 seconds, so a refresh is a snapshot, not a live feed.
+- "Working" comes from `list_sessions` at the moment of the refresh, without the session that runs the command, so a refresh is a snapshot, not a live feed.
 - The documents hold names, roles, classes, task titles and progress only. Never write secrets or transcripts to the board.

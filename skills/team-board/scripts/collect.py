@@ -32,8 +32,10 @@ now = time.time() * 1000
 def member(entry, role, project_dir):
     m, mtime = meta_by_id.get(entry["id"], ({}, 0))
     prog = load(os.path.join(PROG, f"{m.get('cliSessionId', '')}.json")) or {}
-    last = max(m.get("lastActivityAt") or 0, mtime)
-    working = now - last < LIVE_MS
+    last = m.get("lastActivityAt") or 0
+    # The app rewrites a session's metadata file for many reasons, so its mtime says nothing
+    # about work. Truth comes from list_sessions (--running); without it, recent activity only.
+    working = (entry["id"] in RUNNING) if RUNNING is not None else now - last < LIVE_MS
     summ = m.get("postTurnSummary") or {}
     done, total = prog.get("done"), prog.get("total")
     started = prog.get("startedAt")
@@ -53,6 +55,11 @@ def member(entry, role, project_dir):
 
 
 args = sys.argv[1:]
+# --running id1,id2 (or "none"): session ids list_sessions reports as running right now.
+RUNNING = None
+if "--running" in args:
+    raw = args[args.index("--running") + 1]
+    RUNNING = set() if raw in ("", "none") else set(raw.split(","))
 only = os.path.normcase(os.path.abspath(args[args.index("--project") + 1])) if "--project" in args else None
 outdir = args[args.index("--outdir") + 1] if "--outdir" in args else None
 
