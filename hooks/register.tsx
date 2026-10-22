@@ -119,32 +119,47 @@ export const register: Register = on => {
       }
     }
 
-    // The task file of a helper: the one it performs that is in progress.
-    const taskOf = async (cwd: string, name: string): Promise<string | undefined> => {
+    // What the task files say about a helper: its current task and how many of its tasks are done.
+    // Header lines are 'Key: value', or several of them on one line separated by '|'.
+    const ACTIVE = ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується']
+    const DONE = ['done', 'виконано', 'готово']
+    const tasksFor = async (cwd: string, name: string): Promise<{ current?: string; done: number; total: number }> => {
+      const res: { current?: string; done: number; total: number } = { done: 0, total: 0 }
       try {
         const dir = [cwd, '_orchestration', 'tasks'].join(sep)
         const first = name.toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')[0] ?? ''
+        if (!first) return res
         for (const f of await $.fs.list(dir)) {
           if (f.kind !== 'file' || !f.name.endsWith('.md')) continue
           const path = [dir, f.name].join(sep)
           let c = taskCache.get(path)
           if (!c || c.mtime !== f.mtimeMs) {
-            const text = String(await $.fs.read(path))
-            const pick = (re: RegExp) => (text.match(re)?.[1] ?? '').trim()
-            c = {
-              mtime: f.mtimeMs,
-              title: pick(/^#\s*(.+)$/m),
-              status: pick(/^(?:Status|Статус):\s*(.+)$/im).toLowerCase(),
-              performer: pick(/^(?:Performer|Виконавець):\s*(.+)$/im).toLowerCase(),
+            const lines = String(await $.fs.read(path)).split(String.fromCharCode(10)).slice(0, 14)
+            const title = (lines.find(l => l.startsWith('# ')) ?? '').slice(2).trim()
+            let status = ''
+            let performer = ''
+            for (const line of lines) {
+              for (const part of line.split('|')) {
+                const i = part.indexOf(':')
+                if (i < 0) continue
+                const key = part.slice(0, i).trim().toLowerCase()
+                const val = part.slice(i + 1).trim().toLowerCase()
+                if ((key === 'status' || key === 'статус') && !status) status = val
+                if ((key === 'performer' || key === 'виконавець') && !performer) performer = val
+              }
             }
+            c = { mtime: f.mtimeMs, title, status, performer }
             taskCache.set(path, c)
           }
-          if (c.status.startsWith('in-progress') && first && c.performer.includes(first)) return c.title
+          if (!c.performer.includes(first)) continue
+          res.total += 1
+          if (DONE.some(w => c.status.startsWith(w))) res.done += 1
+          else if (!res.current && ACTIVE.some(w => c.status.startsWith(w))) res.current = c.title
         }
       } catch {
         // no tasks folder
       }
-      return undefined
+      return res
     }
 
     const poll = async (): Promise<void> => {
@@ -177,14 +192,18 @@ export const register: Register = on => {
           const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
           if (isRun && !nextSince[entry.id]) nextSince[entry.id] = now
           if (!isRun) delete nextSince[entry.id]
-          const hasSteps = typeof prog?.total === 'number' && prog.total > 0
-          const done = hasSteps ? Math.min(prog?.total ?? 0, prog?.done ?? 0) : undefined
+          const tf = await tasksFor(meta?.cwd ?? cwd, entry.name)
           const isFresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
+          // The helper's own reports win; without them the bar is its task files: done of its own.
+          const reported = isFresh && typeof prog?.total === 'number' && prog.total > 0
+          const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
+          const hasSteps = typeof total === 'number' && total > 0
+          const done = hasSteps ? Math.min(total ?? 0, reported ? (prog?.done ?? 0) : tf.done) : undefined
           const base = prog?.startedAt && isFresh ? prog.startedAt : nextSince[entry.id]
           const elapsed = isRun && base ? now - base : undefined
-          const eta = isRun && hasSteps && done && done > 0 && elapsed !== undefined && prog && (prog.total ?? 0) > done ? (elapsed / done) * ((prog.total ?? 0) - done) : undefined
+          const eta = isRun && hasSteps && done && done > 0 && elapsed !== undefined && (total ?? 0) > done ? (elapsed / done) * ((total ?? 0) - done) : undefined
           const summary = meta?.postTurnSummary
-          const task = (isFresh ? prog?.task : undefined) ?? (isRun ? await taskOf(meta?.cwd ?? cwd, entry.name) : undefined) ?? (isRun ? undefined : summary?.status_detail)
+          const task = (isFresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail)
           out.push({
             id: entry.id,
             name: entry.name,
@@ -194,7 +213,7 @@ export const register: Register = on => {
             task,
             note: isRun ? (isFresh ? prog?.note : undefined) : !isRun && task === summary?.status_detail ? undefined : summary?.status_detail,
             done,
-            total: hasSteps ? prog?.total : undefined,
+            total: hasSteps ? total : undefined,
             elapsedMs: elapsed,
             etaMs: eta,
           })

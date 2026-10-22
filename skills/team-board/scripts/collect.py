@@ -67,7 +67,7 @@ def norm_status(raw):
         return "working"
     if r.startswith(("paused", "пауза", "blocked", "заблок")):
         return "paused"
-    if r.startswith(("pending", "queued", "todo", "new", "в черзі", "очікує")):
+    if r.startswith(("pending", "queued", "todo", "new", "prep-done", "в черзі", "очікує")):
         return "queued"
     return "queued" if r else "unknown"
 
@@ -87,13 +87,14 @@ def tasks_of(pdir):
              "title": title.split(":", 1)[1].strip() if ":" in title else title,
              "priority": "", "status": "", "performer": "", "depends": ""}
         for ln in lines:
-            if ":" not in ln:
-                continue
-            k, v = ln.split(":", 1)
-            k = k.strip().lower()
-            for name, aliases in KEYS.items():
-                if k in aliases:
-                    t[name] = v.strip()
+            for part in ln.split("|"):  # several 'Key: value' pairs may share one line
+                if ":" not in part:
+                    continue
+                k, v = part.split(":", 1)
+                k = k.strip().lower()
+                for name, aliases in KEYS.items():
+                    if k in aliases and not t[name]:
+                        t[name] = v.strip()
         t["status"] = norm_status(t["status"])
         t["depends"] = "" if t["depends"] in ("-", "0", "none", "немає") else t["depends"].replace("(", ",").split(",")[0].strip()[:40]
         t["performer"] = t["performer"].split(".")[0][:40]

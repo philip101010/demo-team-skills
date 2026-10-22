@@ -12,6 +12,10 @@ const ROSTER = JSON.stringify({
   members: [{ name: 'Gareth', id: 'local_g', class: 'barbarian' }, { name: 'Lamorak', id: 'local_l', class: 'rogue' }],
 })
 
+const TASK = `# T-11: Track A
+Priority: P0 | Status: todo | Performer: Gareth | Depends on: -
+`
+
 test('the pane draws the team', async ($, on) => {
   on('command.register', () => ({ value: { command: 'team' } }))
   on('tool.register', () => ({ value: {} }))
@@ -24,8 +28,8 @@ test('the pane draws the team', async ($, on) => {
   on('clock.every', () => ({ value: undefined }))
   on('store.get', () => ({ value: undefined }))
   on('store.set', () => ({ value: undefined }))
-  on('fs.read', (_, e: any) => ({ value: String(e.path).endsWith('roster.json') ? ROSTER : '{}' }))
-  on('fs.list', () => ({ value: [] }))
+  on('fs.read', (_, e: any) => ({ value: String(e.path).endsWith('roster.json') ? ROSTER : String(e.path).endsWith('T-11.md') ? TASK : '{}' }))
+  on('fs.list', () => ({ value: [{ kind: 'file', name: 'T-11.md', mtimeMs: 1 }] as never }))
   on('fs.exists', () => ({ value: false }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
   on('tool.call', () => ({ result: { text: '[]' } }))
@@ -35,6 +39,8 @@ test('the pane draws the team', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const row = await ui.find({ type: 'Text', text: /Gareth/ })
   expect(row?.text).toBe('Gareth')
+  // No progress report: the bar falls back to the helper's own task files, read from a one-line header.
+  expect((await ui.find({ type: 'Text', text: /0\/1/ }))?.text).toContain('0/1')
   await ui.unmount()
 
   // Wider panes put two or three to a row; the widths must stay ones the engine accepts.
