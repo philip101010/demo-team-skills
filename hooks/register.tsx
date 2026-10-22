@@ -27,7 +27,7 @@ const since = atom({ plugin: 'demo-team-roster', key: 'since' } as const, {} as 
 const isOrch = atom({ plugin: 'demo-team-roster', key: 'isOrchestrator' } as const, false)
 const debug = atom({ plugin: 'demo-team-roster', key: 'debug' } as const, '')
 
-type RosterEntry = { name: string; id: string; class?: string }
+type RosterEntry = { name: string; id: string; class?: string; cwd?: string }
 type RosterFile = { orchestrator?: RosterEntry; members?: RosterEntry[] }
 type Progress = { task?: string; note?: string; done?: number; total?: number; startedAt?: number; updatedAt?: number }
 type SessionMeta = {
@@ -97,20 +97,27 @@ const makeTools = ($: any) => {
           }
         }
       }
-    } catch {
-      // no sessions folder: nothing to show
+    } catch (error) {
+      diag.metaError = String((error as Error)?.message ?? error).slice(0, 60)
     }
     return undefined
   }
 
+  // The helper's own progress report: a file per chat, named by its app id (known to the watcher) or its engine id.
+  const progressFor = async (id: string, meta?: SessionMeta): Promise<Progress | undefined> =>
+    (await readJson<Progress>([rosterDir, `${id}.json`].join(sep))) ?? (meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined)
+
   // A failed call is not forever: try again after a while (the tool may not be ready at start).
-  const diag = { listError: '' }
+  const diag = { listError: '', metaError: '' }
+  let linkedRunning: Set<string> | undefined
   const runningIds = async (): Promise<Set<string> | undefined> => {
     const now = Number(await $.clock.now())
     if (!canList && now - listFailedAt < 20000) return undefined
     try {
       const res = await $.tool.call({ tool: LIST_TOOL, limit: 100 } as never)
-      const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; isRunning?: boolean }[]
+      const text = textOf(res) || '[]'
+      if (!text.trimStart().startsWith('[')) throw new Error(text.slice(0, 70))
+      const rows = JSON.parse(text) as { sessionId: string; isRunning?: boolean }[]
       canList = true
       diag.listError = ''
       return new Set(rows.filter(r => r.isRunning).map(r => r.sessionId))
@@ -137,13 +144,15 @@ const makeTools = ($: any) => {
       const selfLocal = (JSON.parse(textOf(me) || '{}') as { sessionId?: string }).sessionId
       if (!selfLocal) return undefined
       const res = await $.tool.call({ tool: LIST_TOOL, linked: true, limit: 100 } as never)
-      const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; title?: string; name?: string; startedBy?: string; isArchived?: boolean }[]
+      const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; title?: string; name?: string; cwd?: string; startedBy?: string; isArchived?: boolean; isRunning?: boolean }[]
       const helpers = rows.filter(r => r.startedBy === selfLocal && !r.isArchived)
       if (helpers.length === 0) return undefined
+      // The same list says who is running right now.
+      linkedRunning = new Set(helpers.filter(r => r.isRunning).map(r => r.sessionId))
       const nameOf = (r: { title?: string; name?: string }): string => (r.title ? r.title.split(' (')[0] : (r.name ?? 'helper')) ?? 'helper'
       return {
         orchestrator: { name: 'Lead', id: selfLocal, class: 'king' },
-        members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId })),
+        members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId, cwd: r.cwd })),
       }
     } catch {
       return undefined
@@ -290,7 +299,7 @@ const makeTools = ($: any) => {
         const file = await findMeta(e.id)
         const meta = file ? await readJson<SessionMeta>(file) : undefined
         const isRun = running ? running.has(e.id) : false
-        const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
+        const prog = await progressFor(e.id, meta)
         const tf = await tasksFor(dir, e.name)
         const fresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
         const reported = fresh && typeof prog?.total === 'number' && prog.total > 0
@@ -327,7 +336,7 @@ const makeTools = ($: any) => {
     }
     return { generatedAt: now, projects }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, snapshot, diag }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds: () => linkedRunning, progressFor, runningIds, tasksFor, snapshot, diag }
 }
 
 export const register: Register = on => {
@@ -354,7 +363,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, diag } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor, diag } = makeTools($)
     let wasOpened = false
     let polls = 0
     const closedKey = (cwd: string): string => `closed:${cwd}`
@@ -373,7 +382,7 @@ export const register: Register = on => {
         }
         const entries: RosterEntry[] = [...(roster.orchestrator ? [roster.orchestrator] : []), ...(roster.members ?? [])]
         let selfRole: 'orchestrator' | 'member' | 'outsider' = 'outsider'
-        const running = await runningIds()
+        const running = (!fromFile ? linkedRunningIds() : undefined) ?? (await runningIds())
         const now = await $.clock.now()
         const started = await read($, since)
         const nextSince: Record<string, number> = { ...started }
@@ -391,10 +400,10 @@ export const register: Register = on => {
             isRun = !!stat && now - stat.mtimeMs < 45000
           }
           if (meta?.cliSessionId && meta.cliSessionId === selfCli) selfRole = roster.orchestrator && entry.id === roster.orchestrator.id ? 'orchestrator' : 'member'
-          const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
+          const prog = await progressFor(entry.id, meta)
           if (isRun && !nextSince[entry.id]) nextSince[entry.id] = now
           if (!isRun) delete nextSince[entry.id]
-          const tf = await tasksFor(meta?.cwd ?? projectDir ?? cwd, entry.name)
+          const tf = await tasksFor(entry.cwd ?? meta?.cwd ?? projectDir ?? cwd, entry.name)
           const isFresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
           // The helper's own reports win; without them the bar is its task files: done of its own.
           const reported = isFresh && typeof prog?.total === 'number' && prog.total > 0
@@ -423,7 +432,7 @@ export const register: Register = on => {
         await update($, members, () => out)
         polls += 1
         const withBar = out.filter(m => typeof m.total === 'number').length
-        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar} · meta ${metaFound}/${entries.length}${diag.listError ? ` · list error: ${diag.listError}` : ''}`)
+        await update($, debug, () => `poll ${polls} · ${fromFile ? 'roster file' : 'linked chats'} · running ${running ? [...running].filter(id => entries.some(e => e.id === id)).length : 'n/a'} of ${entries.length} · bars ${withBar} · meta ${metaFound}/${entries.length}${diag.listError ? ` · list error: ${diag.listError}` : ''}${diag.metaError ? ` · meta error: ${diag.metaError}` : ''}`)
         await update($, since, () => nextSince)
         // The team is watched by the orchestrator and by any other chat in the project folder that is
         // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
@@ -505,6 +514,15 @@ export const register: Register = on => {
       updatedAt: now,
     }
     await $.fs.write(file, JSON.stringify(data))
+    // The watcher knows a helper by its app id, so the same report is kept under that name too.
+    try {
+      const me = await $.tool.call({ tool: GET_TOOL, session_id: 'self' } as never)
+      const text = String((me as { text?: string; result?: { text?: string } })?.text ?? (me as { result?: { text?: string } })?.result?.text ?? '')
+      const local = (JSON.parse(text || '{}') as { sessionId?: string }).sessionId
+      if (local) await $.fs.write([home, '.claude', 'demo-team-roster', `${local}.json`].join(sep), JSON.stringify(data))
+    } catch {
+      // the engine-id file is still there
+    }
     return { result: 'ok' }
   })
 

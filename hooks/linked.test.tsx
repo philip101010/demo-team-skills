@@ -37,6 +37,8 @@ test('without a roster file the pane lists the chats this chat started', async (
   await new Promise(r => setTimeout(r, 200))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await ui.find({ type: 'Text', text: /Kei/ }))?.text).toBe('Kei')
+  // Kei is running in the same list, so no second call is needed to know it.
+  expect(await ui.find({ type: 'Text', text: /working/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Other/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /Old/ })).toBeUndefined()
   await ui.unmount()
