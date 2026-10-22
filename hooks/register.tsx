@@ -568,26 +568,26 @@ export const register: Register = on => {
                 )}
                 <Box flexDirection="column" flexGrow={1}>
                   <Box justifyContent="space-between">
-                    <Text weight="semibold" size="footnote">
+                    <Text weight="semibold" size="caption">
                       {m.name}
                     </Text>
-                    <Text size="footnote" dimColor>
+                    <Text size="caption" dimColor>
                       {pctOf(m) || ' '}
                     </Text>
                   </Box>
                   <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
                   <Box justifyContent="space-between">
-                    <Text size="footnote" dimColor>
+                    <Text size="caption" dimColor>
                       {elapsedOf(m) || ' '}
                     </Text>
-                    <Text size="footnote" dimColor>
+                    <Text size="caption" dimColor>
                       {etaOf(m) || ' '}
                     </Text>
                   </Box>
-                  <Text wrap="truncate-end" size="footnote" dimColor={m.state !== 'working'}>
+                  <Text wrap="truncate-end" size="caption" dimColor={m.state !== 'working'}>
                     {m.task ?? (m.state === 'working' ? 'working…' : 'no task')}
                   </Text>
-                  <Text wrap="truncate-end" size="footnote" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
+                  <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
                     {stepOf(m) || ' '}
                   </Text>
                 </Box>

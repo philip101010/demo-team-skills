@@ -213,9 +213,9 @@ export const stepOf = (m: Member): string => (m.isBlocked ? `Blocked: ${m.note ?
 export const WARN = '#c0392b'
 
 // The knight alone, a fixed size on screen: it never scales with the room around it.
-// It is drawn on a 44x40 grid and shown at about twice that.
-export const SPRITE_W = 84
-export const SPRITE_H = 76
+// It is drawn on a 44x40 grid and shown at about one and a half times that.
+export const SPRITE_W = 64
+export const SPRITE_H = 58
 const GRID_W = 44
 const GRID_H = 40
 
@@ -229,7 +229,7 @@ export const spriteSvg = (m: Member, w: number = SPRITE_W, h: number = SPRITE_H)
 
 // The thin progress bar: stretches across whatever width it is given, its height fixed
 // by the caller. A known fraction fills; a working task with no steps runs a slider.
-export const BAR_H = 4
+export const BAR_H = 6
 export const barSvg = (m: Member): string => {
   const isRun = m.state === 'working'
   const color = ACCENT[m.cls]
