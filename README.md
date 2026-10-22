@@ -31,7 +31,7 @@ Skills only, without the widget: copy `skills/new-demo-team` and `skills/team-bo
 
 - Needs Claude Code desktop session tools: `start_session`, sidebar group tools, `change_directory`, `send_message`, `list_sessions`.
 - The widget reads the other chats' state from the app's session metadata and `list_sessions`; helpers appear as working while their chat is running.
-- The dashboard is a snapshot written by `/team-board`, not a live feed: "working" means active in the running at the moment of the refresh (the session that runs the command does not count).
+- The dashboard shows a snapshot written by `/team-board` until you press **Go live** on the page. Then it asks the plugin's read-only `team_snapshot` tool (through the Claude desktop app, owner only) for every project's roster every 5 seconds and shows it as it is. The first press asks for your consent; outside the desktop app the page stays on the snapshot. "Working" is what `list_sessions` reports at that moment.
 - Passwords, tokens and clio environment registration stay with the user; the skills never handle them.
 - The skills and the protocol are in English. They reply, and write project artifacts and helper briefs, in the language the user writes in (default English).
 - To rebuild the dashboard page after editing `tools/dashboard.src.html` or `hooks/sprites.ts`: `node tools/build-dashboard.mjs` (Node 22.13+).
