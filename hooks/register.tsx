@@ -294,7 +294,7 @@ export const register: Register = on => {
     }
     // Two minimums wide: two to a row, three: three, and so on. A little slack for the frame.
     const perRow = Math.max(1, Math.floor(((cols || minCols) + 2) / minCols))
-    const width = `${(100 / perRow).toFixed(3)}%`
+    const width = `${Math.floor(100 / perRow)}%`
     const rows: Member[][] = []
     for (let i = 0; i < list.length; i += perRow) rows.push(list.slice(i, i + perRow))
     return (
