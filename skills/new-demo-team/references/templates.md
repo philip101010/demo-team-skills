@@ -1,18 +1,20 @@
 # Templates for new-demo-team
 
+Write the content of every generated file and brief in the working language (the user's language, default English). File names, keys and status codes (`todo`, `done`, `paused`, `P0`) stay in English.
+
 ## PROJECT block (start of every brief and every task file)
 ```
 PROJECT: <NAME>
 Folder: C:\Projects\Workspaces\<NAME>
 Stand: <URL>   clio env: <ENV> (always pass environment-name)   AI Studio profile: <PROFILE> (always pass --profile)
-Deadline: <DATE>   MVP: <BOUNDARY>   Priority: <P0/P1/P2>
+Deadline: <DATE>   MVP: <BOUNDARY>   Priority: <P0/P1/P2>   Language: <LANGUAGE>
 Orchestrator: <ORCH NAME> (session_id <ID>)
 Ignore the context of any other project.
 ```
 
 ## Helper prompt (start_session prompt)
 ```
-You are helper <NAME> in the team of project <PROJECT> (group "<GROUP>"). Work in Ukrainian.
+You are helper <NAME> in the team of project <PROJECT> (group "<GROUP>"). Work in <LANGUAGE>.
 Your folder: C:\Projects\Workspaces\<PROJECT>. Your orchestrator: <ORCH NAME> (session_id <ID>); briefs arrive from the orchestrator through messages. Do nothing until the first brief.
 Every brief starts with a PROJECT block. Work only inside it. Always pass an explicit environment-name and --profile. Team protocol: C:\Projects\Workspaces\<PROJECT>\_orchestration\PROTOCOL.md (sections 3, 5, 6, 11).
 Rules: only your own tasks and locks; never change the active clio environment or run `studio use`; never enter or repeat passwords/tokens; write nothing to the stand unless the task says writes are approved; when you run low on limit stop at a safe point with status `paused` and a Handoff block; when a task is done report status and 3-5 conclusions to the orchestrator and write the result into the task file.

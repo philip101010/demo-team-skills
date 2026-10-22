@@ -5,9 +5,15 @@ description: Launch a new Creatio demo project from a fresh chat. The user drops
 
 # new-demo-team
 
-This session becomes the ORCHESTRATOR of a new demo project. Work in Ukrainian. Tools you need (load with ToolSearch if deferred): `mcp__ccd_session__start_session`, `mcp__ccd_sidebar__create_group`, `mcp__ccd_sidebar__move_sessions`, `mcp__ccd_session_mgmt__set_session_title`, `mcp__ccd_session_mgmt__list_sessions`, `mcp__ccd_session_mgmt__get_session`, `mcp__ccd_session_mgmt__send_message`, `mcp__ccd_directory__change_directory`.
+This session becomes the ORCHESTRATOR of a new demo project. Tools you need (load with ToolSearch if deferred): `mcp__ccd_session__start_session`, `mcp__ccd_sidebar__create_group`, `mcp__ccd_sidebar__move_sessions`, `mcp__ccd_session_mgmt__set_session_title`, `mcp__ccd_session_mgmt__list_sessions`, `mcp__ccd_session_mgmt__get_session`, `mcp__ccd_session_mgmt__send_message`, `mcp__ccd_directory__change_directory`.
 
 Read `references/protocol.md` (team protocol) and `references/templates.md` (prompts and file templates) before step 3. Never print or repeat passwords/tokens.
+
+## Language
+- Default language is English. If the user writes to you in another language, switch to that language and keep using it, even if the scenario or other files are in a different language; if the user later switches language, follow them.
+- The working language applies to chat replies, the plan and approvals package shown to the user, project artifacts (`STATE.md`, `ROADMAP.md`, `APPROVALS.md`, task files, reports, the requirements table, the roadmap timeline labels) and the briefs and prompts sent to helpers (set `Language: <LANGUAGE>` in the PROJECT block and the helper prompt).
+- Keep in English regardless of language: file and folder names, keys and status codes (`todo`, `done`, `paused`, `blocked-approval`, `P0`..`P2`), tool names and the lock/entity prefixes.
+- Quote user-provided names (customer, scenario text) exactly as given.
 
 ## Hard rules
 - Passwords, tokens and browser sign-in are the user's only. The user registers the clio environment (`clio reg-web-app ...`); you never do and never change the active clio environment, never run `studio use`. Always pass an explicit `environment-name` and `--profile`.
@@ -31,9 +37,9 @@ From what the user gave (text, attached files, paths), extract: customer / demo 
 a. Create `C:\Projects\Workspaces\<name>\` and subfolders `materials\` and `_orchestration\{tasks,locks,findings}`. COPY the scenario into `materials\` (never move the user's original). If the scenario was pasted as text, save it as `materials\scenario.md`.
 b. Create `_orchestration\` files from `references/templates.md`: `STATE.md`, `ROADMAP.md`, `APPROVALS.md`, and copy `references/protocol.md` to `_orchestration\PROTOCOL.md`.
 c. `change_directory` to the project folder (it takes effect when this turn ends; until then use absolute paths).
-d. `create_group` with the customer name.
+d. `create_group` with the customer name prefixed by "📁 " (e.g. `📁 KMF Bank`), so groups stand out from sessions in the sidebar.
 e. Start N helpers: `start_session` with `initiation: "user_asked"`, `context: "fresh"`, `cwd` = project folder, `use_worktree: false`, `name` = lowercase handle, `title` = `<Name> (<Project>)`, `prompt` = helper prompt from templates, `background` = 2-3 sentences of project context (>= 80 chars). Wave 0 helpers are read-only, so they may use a cheaper model (`model`) when the user is fine with it.
-f. Move yourself and all helpers into the group (`move_sessions`; your own id from `get_session` with `self`). Title yourself `<OrchName> (оркестратор, <Project>)`.
+f. Move yourself and all helpers into the group (`move_sessions`; your own id from `get_session` with `self`). Title yourself `<OrchName> (orchestrator, <Project>)`.
 g. Update `STATE.md` (team, session ids, stand, status "wave 0 started").
 If `start_session` does not honor `cwd`, tell the user immediately and stop at that point.
 

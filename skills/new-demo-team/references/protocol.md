@@ -1,203 +1,205 @@
-# Протокол паралельної роботи над демо
+# Parallel demo work protocol
 
-Діє для оркестратора і всіх паралельних чатів. Один стенд, багато виконавців: ділимо роботу за **сутностями**, щоб задачі не перетинались у часі.
+Applies to the orchestrator and all parallel chats. One stand, many performers: work is divided by **entities** so tasks do not overlap in time.
 
-## 1. Структура в папці демо
+## 1. Structure in the demo folder
 
 ```
-<демо>/_orchestration/
-  ROADMAP.md        # усі задачі, залежності, хвилі
-  tasks/T-NN.md     # одна задача = один файл
-  locks/<тип>-<ім'я>.lock   # одна сутність = один лок
+<demo>/_orchestration/
+  ROADMAP.md        # all tasks, dependencies, waves
+  tasks/T-NN.md     # one task = one file
+  locks/<type>-<name>.lock   # one entity = one lock
 ```
 
-Типи сутностей для локів: `object-`, `lookup-`, `page-`, `process-`, `aiskill-`, `dashboard-`, `landing-`, `template-`, `data-`, `syssetting-`.
-Глобальні (ексклюзивні) локи: `GLOBAL-compile.lock`, `GLOBAL-base-objects.lock`, `GLOBAL-localization.lock`.
+Entity types for locks: `object-`, `lookup-`, `page-`, `process-`, `aiskill-`, `dashboard-`, `landing-`, `template-`, `data-`, `syssetting-`.
+Global (exclusive) locks: `GLOBAL-compile.lock`, `GLOBAL-base-objects.lock`, `GLOBAL-localization.lock`.
 
-## 2. Ролі
+## 2. Roles
 
-- **Оркестратор:** розвідка стенду, роадмап, нарізання задач, брифи для чатів, контроль локів, фінальна компіляція/публікація, readiness, ClickPass.
-- **Чат-виконавець:** бере задачу, працює (зі своїми субагентами) строго в межах touch-set, звітує у файл задачі.
-- **Субагенти чату:** розвідка, перевірки, дрібні підзадачі. Не виходять за touch-set.
+- **Orchestrator:** stand recon, roadmap, slicing tasks, briefs for chats, lock control, final compile/publish, readiness, ClickPass.
+- **Performer chat:** takes a task, works (with its own subagents) strictly within the touch-set, reports into the task file.
+- **Chat subagents:** recon, checks, small subtasks. They never go beyond the touch-set.
 
-## 3. Життєвий цикл задачі
+## 3. Task lifecycle
 
 `todo → claimed → in-progress → done`
-Побічні стани: `blocked` (чекає залежність або лок), `paused` (див. розділ 5), `blocked-approval` (потрібен дозвіл, див. розділ 6).
+Side states: `blocked` (waiting for a dependency or a lock), `paused` (see section 5), `blocked-approval` (a permission is needed, see section 6).
 
-1. Перевір, що всі залежності задачі `done` і всі її апруви `granted`.
-2. Захопи локи на **всі** сутності зі свого touch-set. Захоплення атомарне: файл лока створюється, лише якщо його ще немає (`set -o noclobber`). Якщо хоч один лок зайнятий, звільни вже взяті й візьми іншу задачу (або чекай).
-3. Виконай. Не чіпай сутностей поза touch-set. Якщо виявилась потреба: зупинись, допиши сутність у задачу, захопи її лок, або повідом оркестратору.
-4. Запиши в задачу результат і докази (що змінено, як перевірено, посилання).
-5. Звільни локи, постав `done`.
+1. Check that all dependencies of the task are `done` and all its approvals are `granted`.
+2. Acquire locks on **all** entities of your touch-set. Acquisition is atomic: the lock file is created only if it does not exist yet (`set -o noclobber`). If any lock is taken, release those already acquired and take another task (or wait).
+3. Execute. Do not touch entities outside the touch-set. If a need appears: stop, add the entity to the task, acquire its lock, or tell the orchestrator.
+4. Write the result and evidence into the task (what changed, how it was verified, links).
+5. Release the locks, set `done`.
 
-Дві задачі на одну сутність дозволені, але виконуються тільки послідовно (друга чекає лок першої).
+Two tasks on one entity are allowed but run strictly in sequence (the second waits for the first's lock).
 
-## 4. Правила на спільному стенді
+## 4. Rules on a shared stand
 
-- Компіляцію й публікацію пакета запускає **лише оркестратор** (лок `GLOBAL-compile`), після завершення хвилі. Виконавці не компілюють самі, якщо оркестратор не дозволив у задачі.
-- Зміни object model та базових об'єктів іду першою хвилею, до сторінок і процесів.
-- Локалізація іде останньою, після того як усе побудовано.
-- Перед редагуванням сторінки перевір відкриті вкладки дизайнера й актуальний checksum.
-- Протухлий лок (власник мертвий, лок висить довго без оновлень) розбирає оркестратор.
-- Видалення, зміни на чужих сутностях і будь-що незворотне: тільки з підтвердження користувача.
-- **Рестарт і будь-яка дія, що може застопорити інших** (рестарт стенду, установка компонентів зі збіркою конфігурації, повна компіляція, масове скидання даних): перед запуском оркестратор збирає від УСІХ активних помічників підтвердження, що вони завершили (або зупинили на безпечній точці) свої задачі й чекають. Помічник, якому потрібна така дія, пише оркестратору й ставить `blocked-approval`/паузу; оркестратор розсилає всім запит «закінчи/зупинись на безпечній точці і підтверди», дочекається ВСІХ підтверджень, лише тоді запускає, а після завершення перевіряє ping і повідомляє всіх «стенд піднявся, можна продовжувати». Без підтверджень усіх дію не запускати, навіть якщо дозвіл користувача вже є.
+- Compilation and publishing of a package is done **only by the orchestrator** (lock `GLOBAL-compile`), after a wave completes. Performers do not compile themselves unless the orchestrator allowed it in the task.
+- Object-model and base-object changes go in the first wave, before pages and processes.
+- Localization goes last, after everything is built.
+- Before editing a page, check for open designer tabs and the current checksum.
+- A stale lock (owner dead, lock hanging long without updates) is cleaned up by the orchestrator.
+- Deletions, changes to other people's entities and anything irreversible: only with the user's confirmation.
+- **Restart and any action that can stall others** (stand restart, installing components that rebuild the configuration, full compile, mass data reset): before launching, the orchestrator collects from ALL active helpers a confirmation that they have finished (or stopped at a safe point) their tasks and are waiting. A helper who needs such an action writes to the orchestrator and sets `blocked-approval`/pause; the orchestrator sends everyone a "finish/stop at a safe point and confirm" request, waits for ALL confirmations, only then launches, and after completion checks a ping and tells everyone "the stand is back, you can continue". Without confirmations from everyone, do not launch the action, even if the user's permission already exists.
 
-## 5. Правило пауз за лімітами
+## 5. Pause-on-limits rule
 
-Якщо ти розумієш, що ліміту (контексту, токенів, сесійного/тижневого usage) **не вистачить, щоб довести задачу до кінця**, ти **паузишся**, а не починаєш і не обриваєш на півдорозі.
+If you understand that the limit (context, tokens, session/weekly usage) **will not be enough to finish the task**, you **pause** instead of starting or breaking off halfway.
 
-- **Перед стартом:** оціни обсяг задачі й залишок ліміту (оркестратор може перевірити usage сесій). Не вистачає: не бери задачу, напиши оркестратору.
-- **Під час роботи:** щойно бачиш, що не встигнеш, зупинись на **найближчій безпечній точці**: сутність у цілісному стані, нічого напівзмінене, нічого незакомпільоване, що ламає стенд.
-- **При паузі обов'язково:**
-  1. Постав у задачі статус `paused`.
-  2. Допиши блок `## Handoff`: що зроблено, що лишилось, поточний стан сутностей, відомі пастки, з чого продовжити.
-  3. Локи: звільни ті сутності, що в цілісному стані; на сутностях, які залишились частково змінені, **лок тримай** і познач `held-by-paused`.
-  4. Повідом оркестратору (напиши йому в чат або залиш запис у ROADMAP).
-- **Продовження:** оркестратор перепризначає задачу (цьому чату після відновлення ліміту або іншому) за блоком Handoff.
-- Ніколи не лишай стенд у зламаному стані заради «ще одного кроку».
+- **Before starting:** estimate the size of the task and the remaining limit (the orchestrator can check session usage). Not enough: do not take the task, tell the orchestrator.
+- **During work:** as soon as you see you will not make it, stop at the **nearest safe point**: the entity in a consistent state, nothing half-changed, nothing uncompiled that breaks the stand.
+- **When pausing, always:**
+  1. Set the task status to `paused`.
+  2. Add a `## Handoff` block: what is done, what is left, current state of the entities, known traps, where to continue.
+  3. Locks: release the entities that are in a consistent state; keep the lock on entities left partially changed and mark it `held-by-paused`.
+  4. Tell the orchestrator (message it in chat or leave a note in ROADMAP).
+- **Continuation:** the orchestrator reassigns the task (to this chat after the limit recovers, or to another) according to the Handoff block.
+- Never leave the stand broken for the sake of "one more step".
 
-## 6. Preflight: дозволи та апруви (на самому початку)
+## 6. Preflight: permissions and approvals (at the very start)
 
-Усі місця, де потрібен дозвіл чи підтвердження, збираємо **до старту хвилі**, а не посеред роботи. Чат не повинен зависати на запиті під час виконання.
+All places where a permission or confirmation is needed are collected **before the wave starts**, not in the middle of the work. A chat must not hang on a prompt during execution.
 
-**Оркестратор на етапі роадмапу:**
-1. Для кожної задачі заповнює поле `Апруви:` (див. шаблон). Що шукаємо:
-   - незворотні дії: видалення (записів, сутностей, пакетів), `clio-run-destructive`, перезапис існуючих сторінок/процесів;
-   - зміни на спільному/не-dev стенді, публікація, компіляція, рестарт, зміна системних налаштувань;
-   - зовнішні дії: листи, повідомлення, публікація landing, завантаження файлів;
-   - доступи: вхід на інстанс і в сайти (паролі вводить лише користувач), дозвіл браузеру на сайт, токени/ключі;
-   - дозволи інструментів: permission mode чатів, потрібні MCP (clio, браузер, Outlook/SharePoint).
-2. Зводить усе в `_orchestration/APPROVALS.md`: що, для якої задачі, чому, ризик, статус (`pending / granted / denied`).
-3. Робить **технічний preflight** (read-only): інстанс доступний, clio-environment зареєстрований, MCP підключені, потрібні сайти й сесії відкриті, інструменти без блокуючих запитів.
-4. Показує користувачеві **один пакетний запит** на всі апруви й чекає відповіді. Хвиля стартує лише після цього.
+**Orchestrator at the roadmap stage:**
+1. For each task fills in the `Approvals:` field (see the template). What to look for:
+   - irreversible actions: deletion (records, entities, packages), `clio-run-destructive`, overwriting existing pages/processes;
+   - changes on a shared/non-dev stand, publishing, compile, restart, changing system settings;
+   - external actions: emails, messages, landing publishing, file downloads;
+   - access: sign-in to the instance and sites (passwords are entered only by the user), browser permission for a site, tokens/keys;
+   - tool permissions: chat permission mode, needed MCPs (clio, browser, Outlook/SharePoint).
+2. Consolidates everything in `_orchestration/APPROVALS.md`: what, for which task, why, risk, status (`pending / granted / denied`).
+3. Runs a **technical preflight** (read-only): the instance is reachable, the clio environment is registered, MCPs are connected, needed sites and sessions are open, tools have no blocking prompts.
+4. Shows the user **one batched request** for all approvals and waits for the answer. The wave starts only after that.
 
-**Правила для чатів:**
-- Працюють лише в межах `granted` апрувів зі свого скоупу.
-- Якщо під час роботи з'явилась **непередбачена** потреба в дозволі: не блокуватись. Постав у задачі статус `blocked-approval`, допиши, що саме потрібно і чому, збережи стан за правилами паузи (розділ 5), візьми іншу задачу й повідом оркестратору. Оркестратор збирає такі запити й питає користувача пакетом.
-- Апрув діє тільки на ту дію й ту задачу, для якої його дали. Нові задачі і нові стенди потребують нового апруву.
-- Паролі, токени й фінансові дані чат ніколи не вводить: це робить користувач.
+**Rules for chats:**
+- Work only within `granted` approvals of their own scope.
+- If an **unforeseen** need for a permission appears during work: do not block. Set the task status `blocked-approval`, write what exactly is needed and why, save the state per the pause rules (section 5), take another task and tell the orchestrator. The orchestrator collects such requests and asks the user in a batch.
+- An approval applies only to the action and the task it was given for. New tasks and new stands need a new approval.
+- A chat never enters passwords, tokens or financial data: the user does that.
 
-## 7. Старт демо (послідовність оркестратора)
+## 7. Demo start (orchestrator sequence)
 
-1. Розвідка стенду (read-only) і розбір сценарію.
-2. `ROADMAP.md` із графом залежностей і touch-set для кожної задачі.
-3. **Preflight дозволів:** `APPROVALS.md`, технічна перевірка, пакетний запит користувачеві.
-4. Хвиля 1: object model (фундамент).
-5. Хвиля 2: паралельні задачі в чатах (сторінки, процеси, AI-скіли, dashboards, дані).
-6. Інтеграція: компіляція, readiness (`creatio-uc-readiness`), ClickPass.
+1. Stand recon (read-only) and scenario analysis.
+2. `ROADMAP.md` with the dependency graph and touch-set for each task.
+3. **Permission preflight:** `APPROVALS.md`, technical check, batched request to the user.
+4. Wave 1: object model (foundation).
+5. Wave 2: parallel tasks in chats (pages, processes, AI skills, dashboards, data).
+6. Integration: compile, readiness (`creatio-uc-readiness`), ClickPass.
 
-Брифи для чатів оркестратор генерує на кожну хвилю: «ти чат №N, твої задачі T-xx, протокол: `PROTOCOL.md`».
+The orchestrator generates the briefs for chats for each wave: "you are chat #N, your tasks T-xx, protocol: `PROTOCOL.md`".
 
-## 8. Скорочений сценарій: мала задача в існуючому демо
+## 8. Short scenario: a small task in an existing demo
 
-Для точкових змін (колонка, правка сторінки, один процес, промпт скілу, дані), коли демо вже стоїть. Повну розвідку і хвилі не запускаємо.
+For point changes (a column, a page edit, one process, an AI skill prompt, data) when the demo already exists. Full recon and waves are not started.
 
-1. **Прийом:** визначаю демо й інстанс. Читаю `_orchestration/` (локи, задачі в роботі, `APPROVALS.md`). Якщо папки ще немає, створюю мінімальну (`tasks/`, `locks/`).
-2. **Мінімальна розвідка:** читаю лише ті сутності, які чіпає задача, і їхні залежності (що від них залежить).
-3. **Одна-дві таски:** оформлюю `T-NN.md` з touch-set, апрувами, acceptance. Окремий `ROADMAP.md` не потрібен: достатньо запису в журналі.
-4. **Перевірка локів:** якщо сутності вільні, виконую одразу (сам або віддаю одному чату). Якщо зайняті, див. розділ 9.
-5. **Апруви:** якщо задача потребує дозволів (видалення, перезапис, публікація, зовнішні дії), питаю користувача до старту. Якщо ні, не питаю.
-6. **Виконання і доказ:** доказ пропорційний зміні (скріншот, запит до БД, прогін процесу).
-7. **Компіляція/публікація:** якщо ніхто інший не тримає `GLOBAL-compile`, роблю сам. Інакше ставлю в чергу.
-8. **Звіт:** коротке повідомлення за шаблоном розділу 10.
+1. **Intake:** determine the demo and the instance. Read `_orchestration/` (locks, tasks in progress, `APPROVALS.md`). If the folder does not exist yet, create a minimal one (`tasks/`, `locks/`).
+2. **Minimal recon:** read only the entities the task touches and their dependencies (what depends on them).
+3. **One or two tasks:** write `T-NN.md` with touch-set, approvals, acceptance. A separate `ROADMAP.md` is not needed: a log entry is enough.
+4. **Lock check:** if the entities are free, execute right away (yourself or hand to one chat). If taken, see section 9.
+5. **Approvals:** if the task needs permissions (deletion, overwrite, publishing, external actions), ask the user before starting. If not, do not ask.
+6. **Execution and proof:** proof proportional to the change (screenshot, database query, process run).
+7. **Compile/publish:** if nobody else holds `GLOBAL-compile`, do it yourself. Otherwise queue it.
+8. **Report:** a short message using the template of section 10.
 
-Якщо мала задача на практиці виявилась великою (зачіпає багато сутностей чи потребує нової object model), переключаюсь на повний сценарій (розділ 7) і кажу про це.
+If a small task turns out large in practice (touches many entities or needs a new object model), switch to the full scenario (section 7) and say so.
 
-## 9. Конфлікт: нова задача зачіпає сутності, які вже в роботі
+## 9. Conflict: a new task touches entities already in progress
 
-1. Для кожної сутності зі свого touch-set дивлюсь у `locks/`.
-2. **Лок зайнятий:** нова задача стає в чергу за цим локом, статус `blocked`, поле `Чекає: <T-xx / сутність>`. Паралельно беру незалежні таски, не простоюю.
-3. **Оцінка очікування:** дивлюсь на статус і прогрес задачі-власника лока й кажу користувачеві: «чекаємо T-xx на `<сутність>`, орієнтовно <скільки>».
-4. **Лок `held-by-paused`:** власник на паузі, сутність частково змінена. Не чіпаю. Або перепризначаю paused-задачу за блоком `Handoff` (щоб довести її до безпечного стану), або питаю користувача.
-5. **Лок протух** (власник мертвий, довго без оновлень): перевіряю стан сутності, розбираю лок, фіксую в журналі.
-6. **Глобальні локи** (`GLOBAL-compile`, `GLOBAL-base-objects`, `GLOBAL-localization`): задача чекає черги. Задачі, які потребують `GLOBAL-base-objects`, стають перед тими, що залежать від них.
-7. **Чергу на один лок** обслуговую за пріоритетом (розділ 10), а за рівного пріоритету за порядком надходження.
-8. Нічого не перекриваю і не обходжу локи «щоб швидше», навіть коли здається, що зміни не перетинаються.
+1. For each entity of the touch-set, look into `locks/`.
+2. **Lock taken:** the new task queues behind that lock, status `blocked`, field `Waiting for: <T-xx / entity>`. In parallel take independent tasks, do not idle.
+3. **Wait estimate:** look at the status and progress of the lock owner's task and tell the user: "waiting for T-xx on `<entity>`, roughly <how long>".
+4. **Lock `held-by-paused`:** the owner is paused, the entity is partially changed. Do not touch. Either reassign the paused task per its `Handoff` block (to bring it to a safe state), or ask the user.
+5. **Stale lock** (owner dead, long without updates): check the entity state, clean the lock, record it in the log.
+6. **Global locks** (`GLOBAL-compile`, `GLOBAL-base-objects`, `GLOBAL-localization`): the task waits in the queue. Tasks that need `GLOBAL-base-objects` go before those that depend on them.
+7. **A queue on one lock** is served by priority (section 10), and for equal priority in order of arrival.
+8. Never overlap or bypass locks "to be faster", even when the changes seem not to intersect.
 
-## 10. Звіт і пріоритети
+## 10. Report and priorities
 
-### Пріоритети
-Рівні: `P0` (блокує демо або показ найближчим часом), `P1` (потрібно для сценарію), `P2` (покращення). Пріоритет записується в `tasks/T-NN.md`.
-- Порядок виконання: спершу ті, що розблоковують найбільше інших задач (фундамент), потім за пріоритетом, потім за порядком надходження.
-- Пріоритет між різними демо визначає користувач. Якщо не вказано, питаю один раз і записую в `Workspaces/_PRIORITIES.md`.
-- Якщо пріоритети конфліктують (дві P0 на один лок), питаю користувача.
+### Priorities
+Levels: `P0` (blocks the demo or the nearest showing), `P1` (needed for the scenario), `P2` (improvement). Priority is recorded in `tasks/T-NN.md`.
+- Execution order: first those that unblock the most other tasks (foundation), then by priority, then by order of arrival.
+- Priority between different demos is decided by the user. If not specified, ask once and record it in `_orchestration/STATE.md`.
+- If priorities conflict (two P0 on one lock), ask the user.
 
-### Шаблон звіту користувачеві
+### Report template for the user
 ```
-Демо: <назва> (інстанс: <env>)
-Хвиля/задача: <T-xx ...>
+Demo: <name> (instance: <env>)
+Wave/task: <T-xx ...>
 
-| Задача | Пріоритет | Статус | Виконавець | Що зроблено | Що блокує | Результат |
+| Task | Priority | Status | Performer | What was done | What blocks | Result |
 |---|---|---|---|---|---|---|
 
-Потрібно від тебе: <апруви / рішення / вхід на стенд; або "нічого">
-Наступний крок: <що роблю далі>
-Ліміти/паузи: <paused-задачі і чому; або "немає">
+Needed from you: <approvals / decisions / stand sign-in; or "nothing">
+Next step: <what I do next>
+Limits/pauses: <paused tasks and why; or "none">
 ```
-Правила звіту: коротко, статуси чесні (не `done` без доказу), блокери і запити до користувача завжди окремим рядком «Потрібно від тебе».
+Report rules: short, honest statuses (not `done` without proof), blockers and requests to the user always on a separate "Needed from you" line.
 
-## 11. Ізоляція проєктів і команд
+## 11. Project and team isolation
 
-У воркспейсі можуть працювати кілька проєктів одночасно, кожен зі своїм оркестратором і помічниками. Кожна команда живе у своїй смузі.
+Several projects can run in the workspace at the same time, each with its own orchestrator and helpers. Every team lives in its own lane.
 
-**Смуга команди:**
-- Своя папка проєкту (`C:\Projects\Workspaces\<Проєкт>\`) і її `_orchestration`.
-- Свої clio-середовища й свій AI Studio профіль (завжди явно: `environment-name`, `--profile`).
-- Лише сесії зі своєї групи в сайдбарі. Хто «свій», видно через `list_sessions` з фільтром `group`. Чужим сесіям не писати, не будити, не завершувати.
-- Свої локи й задачі.
+**The team's lane:**
+- Its own project folder (`C:\Projects\Workspaces\<Project>\`) and its `_orchestration`.
+- Its own clio environments and its own AI Studio profile (always explicit: `environment-name`, `--profile`).
+- Only sessions from its own sidebar group. Who is "own" is visible through `list_sessions` with a `group` filter. Never message, wake or stop other sessions.
+- Its own locks and tasks.
 
-**Чого не робити ніколи:**
-- Не писати в чужі папки проєктів (читати можна лише для довідки).
-- Не змінювати активне clio-середовище, не робити `studio use`, не змінювати глобальні налаштування clio/AI Studio/Claude.
-- Не редагувати `PROTOCOL.md` без рішення користувача.
-- Не працювати на чужому стенді. Рестарт, компіляція, reset лише на своєму стенді й лише з окремого підтвердження користувача безпосередньо перед дією. Якщо стенд спільний з іншою командою, домовитись через користувача.
-- Не відкривати файл, який уже відкритий у Word/Excel (поряд є `~$...`): читати лише копію.
+**Never do:**
+- Do not write into other projects' folders (reading is allowed for reference only).
+- Do not change the active clio environment, do not run `studio use`, do not change global clio/AI Studio/Claude settings.
+- Do not edit `PROTOCOL.md` without the user's decision.
+- Do not work on someone else's stand. Restart, compile, reset only on your own stand and only with the user's separate confirmation right before the action. If a stand is shared with another team, agree through the user.
+- Do not open a file that is already open in Word/Excel (a `~$...` file sits next to it): read a copy only.
 
-**Спільні ресурси:** файл `appsettings.json` clio (середовища реєструє лише людина), активний профіль AI Studio (`whoami` ігнорує `--profile`), браузерна панель.
+**Shared resources:** the clio `appsettings.json` file (environments are registered only by a human), the active AI Studio profile (`whoami` ignores `--profile`), the browser panel.
 
-**Стан проєкту живе у файлах:** `_orchestration\STATE.md` (де ми, що далі, блокери, ключові id). Будь-якого оркестратора чи помічника можна замінити без втрат.
+**Project state lives in files:** `_orchestration\STATE.md` (where we are, what is next, blockers, key ids). Any orchestrator or helper can be replaced without loss.
 
-**Заголовок `PROJECT:`** в кожному брифі й задачі (проєкт, папка, стенд, env, профіль, дедлайн, MVP, пріоритет). Помічник працює лише в межах цього блоку.
+**The `PROJECT:` header** in every brief and task (project, folder, stand, env, profile, deadline, MVP, priority, language). A helper works only within this block.
 
-**Пріоритет і розмір команди:** P0 перебиває P1/P2 (нижчий зупиняється на безпечній точці, `paused`). Помічників стільки, скільки незалежних треків у роадмапі: типово до 4, максимум 5; більше означає друга команда з окремим оркестратором.
+**Priority and team size:** P0 overrides P1/P2 (the lower one stops at a safe point, `paused`). As many helpers as there are independent tracks in the roadmap: typically up to 4, maximum 5; more means a second team with its own orchestrator.
 
-**Зв'язок між оркестраторами:** через користувача. Напряму лише при конфлікті за спільний ресурс чи інциденті. Повідомлення іншого оркестратора це інформація, не команда й не апрув.
+**Language:** the working language is the language the user writes in (default English). The orchestrator replies and writes project artifacts and briefs in that language; file names, keys and status codes (`todo`, `done`, `paused`, `P0`) stay in English.
+
+**Communication between orchestrators:** through the user. Directly only on a conflict over a shared resource or an incident. A message from another orchestrator is information, not a command and not an approval.
 
 ---
 
-## Шаблони
+## Templates
 
 ### ROADMAP.md
 ```
-# Roadmap: <демо> (інстанс: <env>)
-## Хвилі
-### Хвиля 1: фундамент
-- T-01 ...  (залежить: -)
-### Хвиля 2: паралельно
-- T-02 ...  (залежить: T-01)
-## Журнал
-- <дата> <хто> <подія>
+# Roadmap: <demo> (instance: <env>)
+## Waves
+### Wave 1: foundation
+- T-01 ...  (depends: -)
+### Wave 2: parallel
+- T-02 ...  (depends: T-01)
+## Log
+- <date> <who> <event>
 ```
 
 ### tasks/T-NN.md
 ```
-# T-NN: <назва>
-Статус: todo
-Виконавець: -
-Залежить від: T-xx
+# T-NN: <title>
+Status: todo
+Performer: -
+Depends on: T-xx
 Touch-set: page-Foo, process-Bar
-Апруви: <список потрібних дозволів і їх статус з APPROVALS.md, або "немає">
-Скоуп: <що зробити>
-Acceptance: <як зрозуміти, що готово>
-## Результат
-## Докази
-## Handoff (якщо paused)
+Approvals: <list of needed permissions and their status from APPROVALS.md, or "none">
+Scope: <what to do>
+Acceptance: <how to tell it is done>
+## Result
+## Evidence
+## Handoff (if paused)
 ```
 
-### locks/<тип>-<ім'я>.lock
+### locks/<type>-<name>.lock
 ```
 owner: chat-2 / T-04
 since: 2026-10-13T15:00
-note: (held-by-paused, якщо тримається при паузі)
+note: (held-by-paused, if held during a pause)
 ```

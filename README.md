@@ -26,5 +26,5 @@ Open a new chat in Claude Code desktop (no working folder), drop the scenario fi
 
 - Needs Claude Code desktop session tools: `start_session`, sidebar group tools, `change_directory`, `send_message`.
 - Passwords, tokens and clio environment registration stay with the user; the skill never handles them.
-- The protocol and templates are written in Ukrainian and English; the skill talks to the user in Ukrainian.
+- The skill and its protocol are in English. It replies, and writes project artifacts and helper briefs, in the language the user writes in (default English).
 - The skill is a work in progress; not yet verified on a project with a non-git folder and a chat without a working folder.
