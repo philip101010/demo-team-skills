@@ -13,6 +13,8 @@ export type Member = {
   total?: number
   elapsedMs?: number
   etaMs?: number
+  /** Only the dashboard knows it: the orchestrator card is drawn in the accent colour. */
+  role?: string
 }
 
 declare module 'claude-code' {

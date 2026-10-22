@@ -252,13 +252,14 @@ export const CARD_W = 264
 export const CARD_H = 94
 const CARD_GAP = 10
 // The dashboard's own palette (olive and bone, square corners), drawn over the same card.
-const RETRO_CSS = `<style>.cb{stroke:#4A5236;stroke-width:2}.t{fill:#E4E0C6}.s{fill:#C5C2A6}.m{fill:#9AA086}.track{fill:#323A28}.warn{fill:#FF7A6B}@media (prefers-color-scheme: light){.cb{stroke:#B9A88B}.t{fill:#2A1620}.s{fill:#5C4A52}.m{fill:#7A6A5C}.track{fill:#E0D4B5}.warn{fill:#B3261E}}</style>`
+const RETRO_CSS = `<style>.cb{stroke:#4A5236;stroke-width:2}.t{fill:#E4E0C6}.s{fill:#C5C2A6}.m{fill:#9AA086}.track{fill:#323A28}.warn{fill:#FF7A6B}.cb.lead{fill:rgba(232,163,61,.14);stroke:#E8A33D}.ld{fill:#E8A33D}@media (prefers-color-scheme: light){.cb{stroke:#B9A88B}.t{fill:#2A1620}.s{fill:#5C4A52}.m{fill:#7A6A5C}.track{fill:#E0D4B5}.warn{fill:#B3261E}.cb.lead{fill:rgba(232,163,61,.22);stroke:#C98A1E}.ld{fill:#8A540A}}</style>`
 const DASH = '—'
 const CARD_CSS = `<style>.cb{fill:none;stroke:#d9d8d3}.hl{font-weight:600}@media (prefers-color-scheme: dark){.cb{stroke:#3d3d3a}}</style>`
 
 export const cardSvg = (m: Member, isRetro = false): string => {
   const isRun = m.state === 'working'
   const isAsleep = !isRun
+  const isLead = isRetro && m.role === 'orchestrator'
   const color = ACCENT[m.cls]
   const x0 = 92
   const x1 = CARD_W - 12
@@ -281,10 +282,10 @@ export const cardSvg = (m: Member, isRetro = false): string => {
   const badge = m.isBlocked ? `<circle cx="78" cy="16" r="8" fill="${WARN}"/><text x="78" y="20" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${CARD_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}${isRetro ? RETRO_CSS : ''}
 <defs><clipPath id="bar"><rect x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}"/></clipPath></defs>
-<rect class="cb" x="${isRetro ? 1 : 0.5}" y="${isRetro ? 1 : 0.5}" width="${CARD_W - (isRetro ? 2 : 1)}" height="${CARD_H - (isRetro ? 2 : 1)}" rx="${isRetro ? 0 : 12}"/>
+<rect class="cb${isLead ? ' lead' : ''}" x="${isRetro ? 1 : 0.5}" y="${isRetro ? 1 : 0.5}" width="${CARD_W - (isRetro ? 2 : 1)}" height="${CARD_H - (isRetro ? 2 : 1)}" rx="${isRetro ? 0 : 12}"/>
 <svg x="12" y="16" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
 <rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}" opacity="${live ? 1 : 0.55}"/>${fill}
-${text('t hl', x0, 22, fit(m.name, 18))}${text('s', x1, 22, pctOf(m) || DASH, 'end')}
+${text(isLead ? 'ld hl' : 't hl', x0, 22, fit(m.name, 18))}${text('s', x1, 22, pctOf(m) || DASH, 'end')}
 ${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
 ${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
 ${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}

@@ -6,8 +6,8 @@ Claude Code tools for running Creatio demo builds with a team of parallel chats.
 |---|---|
 | Skill [`new-demo-team`](skills/new-demo-team/SKILL.md) | In a fresh chat: takes a customer scenario, creates the project folder and a sidebar group, starts helper sessions, becomes the orchestrator, runs a read-only wave 0, then produces the requirements table, roadmap timeline and approvals package and waits for the go. It also writes `_orchestration/roster.json` and asks helpers to report progress. |
 | Skill [`team-board`](skills/team-board/SKILL.md) | `/team-board` adds the current project's roster to the Demo Team Roster dashboard (an artifact), moves it from "Stopped" back to "Watching", or refreshes it. `/team-board all` refreshes every project. |
-| Team widget (mod) | A **Team** tab in the right panel: one pixel knight per helper, asleep when idle, fighting or casting when working, with a thin progress bar, percentage, elapsed time, ETA, task and current step. Opens by itself in the orchestrator chat. `/team` toggles it, and a chip above the prompt does the same. |
-| Dashboard | One page for all your projects at once, styled after the Quest Board. Stop or resume watching a project with one button. |
+| Team widget (mod) | A **Team** tab in the right panel: one card per team member. The pixel knight is asleep when idle, fighting or casting when working (each one out of step with the others); next to it are the name and percentage, a progress bar, time in progress and ETA, the task, and the current step, or the blocker in red. An empty value shows as a dash, so a card never changes shape. Opens by itself in the orchestrator chat. `/team` toggles it, and a chip above the prompt does the same. |
+| Dashboard | One page for all your projects at once, styled after the Quest Board, with the same cards as the Team tab (the orchestrator's in amber). Stop or resume watching a project with one button. |
 
 ## Install
 
@@ -30,7 +30,7 @@ Skills only, without the widget: copy `skills/new-demo-team` and `skills/team-bo
 ## Notes
 
 - Needs Claude Code desktop session tools: `start_session`, sidebar group tools, `change_directory`, `send_message`, `list_sessions`.
-- The widget reads the other chats' state from the app's session metadata and `list_sessions`; helpers appear as working while their chat is running.
+- The team is read from `_orchestration/roster.json` when there is one (in the chat's folder, or found by chat id in a neighbouring folder). Without a file, the team is the chats the current chat started, read from `list_sessions` (linked chats); a chat shows as working while it is running. Progress comes from the helper's own `roster_step` reports, or from its task files.
 - The dashboard shows a snapshot written by `/team-board` until you press **Go live** on the page. Then it asks the plugin's read-only `team_snapshot` tool (through the Claude desktop app, owner only) for every project's roster every 5 seconds and shows it as it is. The first press asks for your consent; outside the desktop app the page stays on the snapshot. "Working" is what `list_sessions` reports at that moment.
 - Passwords, tokens and clio environment registration stay with the user; the skills never handle them.
 - The skills and the protocol are in English. They reply, and write project artifacts and helper briefs, in the language the user writes in (default English).
