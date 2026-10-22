@@ -248,8 +248,9 @@ export const barSvg = (m: Member): string => {
 // The whole card as one drawing: border, knight, name, bar and four rows of text, laid out in pixels
 // (the pane's own text rows are taller than a card wants). Long text is cut by hand, there being no
 // way to measure it here. Empty values are a dash, so the card never changes shape.
-export const CARD_W = 280
-export const CARD_H = 104
+export const CARD_W = 264
+export const CARD_H = 94
+const CARD_GAP = 10
 const DASH = '—'
 const CARD_CSS = `<style>.cb{fill:none;stroke:#d9d8d3}.hl{font-weight:600}@media (prefers-color-scheme: dark){.cb{stroke:#3d3d3a}}</style>`
 
@@ -269,22 +270,22 @@ export const cardSvg = (m: Member): string => {
   const fill = !live
     ? ''
     : hasSteps
-      ? `<rect x="${x0}" y="32" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
-      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="32" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
+      ? `<rect x="${x0}" y="28" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
+      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="28" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
   const text = (cls: string, x: number, y: number, s: string, anchor = 'start'): string =>
     `<text class="${cls}" x="${x}" y="${y}" font-size="12" text-anchor="${anchor}">${esc(s)}</text>`
   const task = m.task ?? (isRun ? 'working…' : DASH)
   const step = stepOf(m) || DASH
-  const badge = m.isBlocked ? `<circle cx="78" cy="21" r="8" fill="${WARN}"/><text x="78" y="25" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}" font-family="Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}
-<defs><clipPath id="bar"><rect x="${x0}" y="32" width="${barW}" height="6" rx="3"/></clipPath></defs>
+  const badge = m.isBlocked ? `<circle cx="78" cy="16" r="8" fill="${WARN}"/><text x="78" y="20" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${CARD_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}
+<defs><clipPath id="bar"><rect x="${x0}" y="28" width="${barW}" height="6" rx="3"/></clipPath></defs>
 <rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${CARD_H - 1}" rx="12"/>
-<svg x="12" y="21" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
-<rect class="track" x="${x0}" y="32" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
-${text('t hl', x0, 25, fit(m.name, 20))}${text('s', x1, 25, pctOf(m) || DASH, 'end')}
-${text('s', x0, 58, elapsedOf(m) || DASH)}${text('s', x1, 58, etaOf(m) || DASH, 'end')}
-${text(isRun ? 't' : 'm', x0, 75, fit(task, 28))}
-${text(m.isBlocked ? 'warn' : 's', x0, 92, fit(step, 28))}
+<svg x="12" y="16" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
+<rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="3" opacity="${live ? 1 : 0.55}"/>${fill}
+${text('t hl', x0, 22, fit(m.name, 18))}${text('s', x1, 22, pctOf(m) || DASH, 'end')}
+${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
+${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
+${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}
 </svg>`
 }
 
