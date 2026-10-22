@@ -51,27 +51,38 @@ button{font:inherit;color:inherit;cursor:pointer}
 .fname h2{margin:0;font-size:19px;font-weight:700;text-wrap:balance}
 .fname .meta{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
 .fname .right{display:flex;align-items:center;gap:10px}
-.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px 18px;padding-top:6px}
-.form{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;padding:8px 12px 12px;background:var(--doc);color:var(--ink);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--shadow)}
-.form::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo)}
-.form.orch{--doc:color-mix(in srgb,var(--accent) 16%,var(--paper));border-color:var(--accent);box-shadow:4px 4px 0 var(--shadow),0 0 0 2px var(--ink)}
-.form.orch .fhead{background:var(--accent);color:var(--on-accent);border-bottom-color:var(--ink)}
-.fhead{display:flex;justify-content:space-between;gap:8px;margin:-8px -12px 0;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:3px double var(--ink);background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(60,40,10,.06) 3px 4px)}
-.body{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:start;min-width:0}
-.who{min-width:0}
-.nm{font-weight:700;font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cols{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:20px 28px;align-items:start}
+@media (max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px 24px;align-content:start}
+.m{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:start;padding:2px 0 2px 8px;border-left:3px solid transparent;min-width:0}
+.m.orch{border-left-color:var(--accent)}
+.m.orch .nm{color:var(--accent)}
+.mb{min-width:0;display:grid;gap:3px}
+.r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.nm{font-weight:700;font-size:16px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font-size:12px;color:var(--muted);white-space:nowrap}
 .st.on{color:var(--stamp-ok)} .st.bad{color:var(--stamp-bad)}
-.lab{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px dotted var(--muted);margin-bottom:3px}
-.val{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.val.dim{color:var(--muted)}
-.prog{display:grid;grid-template-columns:1fr 3ch;gap:8px;align-items:center}
-.barbox{height:6px;border:1px solid var(--ink);background:transparent;overflow:hidden}
+.task{font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task.on{color:var(--ink)}
+.prog{display:grid;grid-template-columns:minmax(0,1fr) 4ch;gap:8px;align-items:center}
+.barbox{height:4px;overflow:hidden}
 .barbox svg{display:block;width:100%;height:100%}
-.pctn{font-size:12px;font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
-.times{font-size:12px;color:var(--muted);min-height:18px;display:flex;justify-content:space-between;gap:8px}
-.stamp{position:absolute;right:10px;bottom:10px;padding:0 10px;font-weight:700;font-size:15px;letter-spacing:.16em;text-transform:uppercase;border:3px double currentColor;transform:rotate(-6deg);mix-blend-mode:var(--blend);pointer-events:none}
-.stamp.bad{color:var(--stamp-bad)}
+.pctn{font-size:11px;font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
+.times{font-size:12px;color:var(--muted);min-height:16px;display:flex;justify-content:space-between;gap:8px}
+.times span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.road{display:grid;gap:8px;min-width:0;align-content:start}
+.road h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px dotted var(--muted);padding-bottom:3px}
+.rsum{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.rbar{height:4px;background:var(--line);overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--stamp-ok)}
+.t{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 8px;padding:5px 0 5px 8px;border-left:3px solid var(--line);font-size:14px}
+.t.s-working{border-left-color:var(--stamp-ok)} .t.s-paused{border-left-color:var(--stamp-bad)} .t.s-done{opacity:.6}
+.tid{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);align-self:baseline;white-space:nowrap}
+.tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm{grid-column:2;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.road details summary{cursor:pointer;font-size:12px;color:var(--muted);padding:4px 0}
+.road details[open] summary{margin-bottom:2px}
+.none{font-size:13px;color:var(--muted)}
 .stop{font-size:13px;padding:3px 10px;color:var(--muted);border:2px solid var(--line);background:transparent}
 .stop:hover{color:var(--ink);border-color:var(--ink)}
 .empty{text-align:center;padding:28px 16px;background:var(--paper);border:3px dashed var(--ink)}
@@ -101,13 +112,26 @@ button{font:inherit;color:inherit;cursor:pointer}
     var m = norm(raw), run = m.state==='working';
     var task = (m.task && m.task!==m.name) ? m.task : (run ? 'working…' : 'no task');
     var stClass = run ? 'on' : m.isBlocked ? 'bad' : '';
-    var pct = pctOf(m), times = timesOf(m);
-    return '<article class="form'+(m.role==='orchestrator'?' orch':'')+'"><div class="fhead"><span>Agent '+formNo(m.id)+'</span><span>'+(m.role==='orchestrator'?'Orchestrator':'Helper')+'</span></div>'+
-      '<div class="body"><div class="spr">'+spriteSvg(m)+'</div><div class="who"><div class="nm">'+esc(m.name)+'</div><div class="st '+stClass+'">'+esc(statusOf(m).replace(/^! /,''))+'</div></div></div>'+
-      '<div><span class="lab">Task</span><div class="val'+(run||m.task?'':' dim')+'" title="'+esc(task)+'">'+esc(task)+'</div></div>'+
-      '<div><span class="lab">Progress</span><div class="prog"><div class="barbox">'+barSvg(m)+'</div><div class="pctn">'+esc(pct)+'</div></div></div>'+
-      '<div class="times"><span>'+esc(m.note||'')+'</span><span>'+esc(times)+'</span></div>'+
-      (m.isBlocked&&!run?'<div class="stamp bad">Blocked</div>':'')+'</article>';
+    return '<div class="m'+(m.role==='orchestrator'?' orch':'')+'"><div class="spr">'+spriteSvg(m)+'</div><div class="mb">'+
+      '<div class="r1"><span class="nm">'+esc(m.name)+'</span><span class="st '+stClass+'">'+esc(statusOf(m))+'</span></div>'+
+      '<div class="task'+(run?' on':'')+'" title="'+esc(task)+'">'+esc(task)+'</div>'+
+      '<div class="prog"><div class="barbox">'+barSvg(m)+'</div><div class="pctn">'+esc(pctOf(m))+'</div></div>'+
+      '<div class="times"><span>'+esc(m.note||'')+'</span><span>'+esc(timesOf(m))+'</span></div></div></div>';
+  }
+  var RANK = {working:0, paused:1, queued:2, unknown:3, done:4};
+  function taskHtml(t){
+    var meta=[t.performer, t.priority, t.depends?'after '+t.depends:''].filter(Boolean).join(' · ');
+    return '<div class="t s-'+esc(t.status)+'"><span class="tid">'+esc(t.id)+'</span><span class="tt" title="'+esc(t.title)+'">'+esc(t.title)+'</span>'+(meta?'<span class="tm">'+esc(meta)+'</span>':'')+'</div>';
+  }
+  function roadHtml(p){
+    var ts=(p.tasks||[]).slice();
+    if(!ts.length) return '<div class="road"><h3>Roadmap</h3><div class="none">No task files yet.</div></div>';
+    ts.sort(function(a,b){ return (RANK[a.status]||0)-(RANK[b.status]||0) || (a.priority||'Z').localeCompare(b.priority||'Z'); });
+    var done=ts.filter(function(t){return t.status==='done'}), open=ts.filter(function(t){return t.status!=='done'});
+    var pc=Math.round(done.length/ts.length*100);
+    return '<div class="road"><h3>Roadmap</h3><div class="rsum"><div class="rbar"><i style="width:'+Math.max(2,pc)+'%"></i></div><span>'+done.length+' of '+ts.length+' done</span></div>'+
+      (open.length? open.map(taskHtml).join('') : '<div class="none">Everything is done.</div>')+
+      (done.length? '<details><summary>'+done.length+' done</summary>'+done.map(taskHtml).join('')+'</details>' : '')+'</div>';
   }
   function setWatching(slug,on){ if(db) db.doc('projects/'+slug).update({watching:on}).catch(function(){}); }
   function render(){
@@ -126,7 +150,7 @@ button{font:inherit;color:inherit;cursor:pointer}
       out += '<section class="file" data-slug="'+esc(p.slug)+'"><div class="fname"><div><h2>'+esc(p.name)+'</h2><div class="meta">'+
         p.working+' of '+p.members.length+' working · updated '+ago(p.generatedAt)+'</div></div><div class="right">'+
         '<button class="btn stop" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
-        (showStopped ? '' : '<div class="members">'+p.members.map(memberHtml).join('')+'</div>')+'</section>';
+        (showStopped ? '' : '<div class="cols"><div class="members">'+p.members.map(memberHtml).join('')+'</div>'+roadHtml(p)+'</div>')+'</section>';
     });
     $('main').innerHTML = out;
   }

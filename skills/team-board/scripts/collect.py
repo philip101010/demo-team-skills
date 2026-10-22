@@ -53,6 +53,54 @@ def member(entry, role, project_dir):
         "lastActivityAt": int(last) or None,
     }
 
+KEYS = {
+    "priority": ("priority", "пріоритет"), "status": ("status", "статус"),
+    "performer": ("performer", "виконавець"), "depends": ("depends on", "залежить від"),
+}
+
+
+def norm_status(raw):
+    r = (raw or "").lower().strip()
+    if r.startswith(("done", "виконано", "готово")):
+        return "done"
+    if r.startswith(("in-progress", "in progress", "working", "в роботі", "виконується")):
+        return "working"
+    if r.startswith(("paused", "пауза", "blocked", "заблок")):
+        return "paused"
+    if r.startswith(("pending", "queued", "todo", "new", "в черзі", "очікує")):
+        return "queued"
+    return "queued" if r else "unknown"
+
+
+def tasks_of(pdir):
+    """Task files tasks/*.md: '# ID: title' plus 'Key: value' header lines (English or Ukrainian keys)."""
+    out = []
+    for tp in sorted(glob.glob(os.path.join(pdir, "_orchestration", "tasks", "*.md"))):
+        try:
+            with open(tp, encoding="utf-8") as f:
+                lines = [ln.rstrip() for ln in f.read().splitlines()[:14]]
+        except Exception:
+            continue
+        head = next((ln for ln in lines if ln.startswith("# ")), "")
+        title = head[2:].strip()
+        t = {"id": (title.split(":", 1)[0].strip() if ":" in title else os.path.splitext(os.path.basename(tp))[0])[:22],
+             "title": title.split(":", 1)[1].strip() if ":" in title else title,
+             "priority": "", "status": "", "performer": "", "depends": ""}
+        for ln in lines:
+            if ":" not in ln:
+                continue
+            k, v = ln.split(":", 1)
+            k = k.strip().lower()
+            for name, aliases in KEYS.items():
+                if k in aliases:
+                    t[name] = v.strip()
+        t["status"] = norm_status(t["status"])
+        t["depends"] = "" if t["depends"] in ("-", "0", "none", "немає") else t["depends"].replace("(", ",").split(",")[0].strip()[:40]
+        t["performer"] = t["performer"].split(".")[0][:40]
+        t["title"] = t["title"][:110]
+        out.append(t)
+    return out
+
 
 args = sys.argv[1:]
 # --running id1,id2 (or "none"): session ids list_sessions reports as running right now.
@@ -77,7 +125,7 @@ for rp in sorted(glob.glob(os.path.join(WORK, "*", "_orchestration", "roster.jso
     ms += [member(e, "helper", pdir) for e in r.get("members", [])]
     projects.append({
         "slug": re.sub(r"[^a-z0-9]+", "-", os.path.basename(pdir).lower()).strip("-"),
-        "name": os.path.basename(pdir), "members": ms,
+        "name": os.path.basename(pdir), "members": ms, "tasks": tasks_of(pdir),
         "working": sum(1 for x in ms if x["state"] == "working"),
     })
 

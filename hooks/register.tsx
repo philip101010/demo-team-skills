@@ -201,8 +201,9 @@ export const register: Register = on => {
         }
         await update($, members, () => out)
         await update($, since, () => nextSince)
-        // The orchestrator watches the team: the chats listed in the roster do not open it for themselves.
-        const isWatcher = selfRole === 'orchestrator' || (selfRole === 'outsider' && !roster.orchestrator)
+        // The team is watched by the orchestrator and by any other chat in the project folder that is
+        // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
+        const isWatcher = selfRole !== 'member'
         await update($, isOrch, () => isWatcher)
         if (!wasOpened && out.length > 0 && isWatcher && !(await $.store.get(closedKey(cwd)))) {
           wasOpened = true
