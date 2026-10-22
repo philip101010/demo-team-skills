@@ -39,8 +39,8 @@ test('the pane draws the team', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const row = await ui.find({ type: 'Text', text: /Gareth/ })
   expect(row?.text).toBe('Gareth')
-  // An idle helper with no task of its own reads "no task"; the percent shows only while it works.
-  expect((await ui.find({ type: 'Text', text: /no task/ }))?.text).toContain('no task')
+  // An empty value keeps its row as a dash, so the tile never changes shape.
+  expect((await ui.find({ type: 'Text', text: /—/ }))?.text).toBe('—')
   await ui.unmount()
 
   // Wider panes put two or three to a row; the widths must stay ones the engine accepts.

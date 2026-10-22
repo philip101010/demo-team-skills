@@ -14,6 +14,8 @@ const PROGRESS_RULE =
   'This project has a team roster (_orchestration/roster.json) that a Team widget and a dashboard show live. Report your own progress with the roster_step tool. It is a deferred tool: load its schema first with ToolSearch (query "select:mcp__demo-team-roster__roster_step"), then call it when you start a task (task = short title, done = 0, total = the number of steps you plan) and after each finished step (done, note = what you do next). Do this before your first real action on a task. Skip it only for one-step work.'
 const LIST_TOOL = 'mcp__ccd_session_mgmt__list_sessions'
 const GET_TOOL = 'mcp__ccd_session_mgmt__get_session'
+// An empty value keeps its row, so the tile never changes shape.
+const EMPTY = '—'
 const SNAP_STATUS: Record<string, string[]> = {
   done: ['done', 'виконано', 'готово'],
   working: ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується'],
@@ -560,40 +562,38 @@ export const register: Register = on => {
         {rows.map(row => (
           <Box flexDirection="row">
             {row.map(m => (
-              <Box width={width} flexDirection="row" gap={1} alignItems="center">
-                {Svg ? (
-                  <Svg source={spriteSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}`} width={SPRITE_W} height={SPRITE_H} />
-                ) : (
-                  <Text>{m.state === 'working' ? '>' : 'z'}</Text>
-                )}
-                <Box flexDirection="column" flexGrow={1}>
-                  <Box justifyContent="space-between">
-                    <Text weight="semibold" size="caption">
-                      {m.name}
-                    </Text>
-                    <Text size="caption" dimColor>
-                      {pctOf(m) || ' '}
-                    </Text>
-                  </Box>
-                  <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
-                  {elapsedOf(m) || etaOf(m) ? (
+              <Box width={width}>
+                <Box flexGrow={1} flexDirection="row" gap={1} alignItems="center" borderStyle="round" borderColor="promptBorder" paddingX={1}>
+                  {Svg ? (
+                    <Svg source={spriteSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}`} width={SPRITE_W} height={SPRITE_H} />
+                  ) : (
+                    <Text>{m.state === 'working' ? '>' : 'z'}</Text>
+                  )}
+                  <Box flexDirection="column" flexGrow={1}>
                     <Box justifyContent="space-between">
-                      <Text size="caption" dimColor>
-                        {elapsedOf(m) || ' '}
+                      <Text weight="semibold" size="caption">
+                        {m.name}
                       </Text>
                       <Text size="caption" dimColor>
-                        {etaOf(m) || ' '}
+                        {pctOf(m) || EMPTY}
                       </Text>
                     </Box>
-                  ) : null}
-                  <Text wrap="truncate-end" size="caption" dimColor={m.state !== 'working'}>
-                    {m.task ?? (m.state === 'working' ? 'working…' : 'no task')}
-                  </Text>
-                  {stepOf(m) ? (
-                    <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
-                      {stepOf(m)}
+                    <Box>{Svg ? <Svg source={barSvg(m)} alt="progress" height={BAR_H} /> : null}</Box>
+                    <Box justifyContent="space-between">
+                      <Text size="caption" dimColor>
+                        {elapsedOf(m) || EMPTY}
+                      </Text>
+                      <Text size="caption" dimColor>
+                        {etaOf(m) || EMPTY}
+                      </Text>
+                    </Box>
+                    <Text wrap="truncate-end" size="caption" dimColor={m.state !== 'working'}>
+                      {m.task ?? (m.state === 'working' ? 'working…' : EMPTY)}
                     </Text>
-                  ) : null}
+                    <Text wrap="truncate-end" size="caption" color={m.isBlocked ? WARN : undefined} dimColor={!m.isBlocked}>
+                      {stepOf(m) || EMPTY}
+                    </Text>
+                  </Box>
                 </Box>
               </Box>
             ))}
