@@ -1,0 +1,11 @@
+{
+  "name": "demo-team-skills",
+  "owner": { "name": "philip101010" },
+  "plugins": [
+    {
+      "name": "demo-team-roster",
+      "source": "./",
+      "description": "new-demo-team and team-board skills plus the Team widget (pixel knights) for parallel demo-build chats."
+    }
+  ]
+}

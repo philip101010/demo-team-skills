@@ -1,0 +1,147 @@
+<title>Demo Team Roster</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: masthead (title, Watching / Stopped switch) over a desk of project files; each file is a paper form holding one tile per agent.
+   Look: the Quest Board's Papers, Please desk: olive-black with faint scanlines, bone lines, amber accent, system font, bright paper forms with form headers, labelled fields and stamps.
+   The agents themselves are the widget's pixel knights, unchanged. */
+:root{
+  --bg:#11150F; --bg-glow:#1D251A; --ink:#E4E0C6; --muted:#9AA086; --paper:#1B2117; --doc:#232B1E;
+  --accent:#E8A33D; --on-accent:#11150F; --line:#4A5236; --shadow:#050703;
+  --hi:rgba(228,224,198,.2); --lo:rgba(0,0,0,.5); --scan:rgba(0,0,0,.3);
+  --red:#C93B2C; --on-red:#FFF1E2; --green:#6FA84A; --on-green:#12200A; --stamp-ok:#8FD67A; --stamp-bad:#FF7A6B; --blend:normal;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#E7D9BF; --bg-glow:#F6EEDC; --ink:#2A1620; --muted:#7A6A5C; --paper:#FBF5E6; --doc:#EFE6C8;
+  --accent:#E8A33D; --on-accent:#2A1620; --line:#B9A88B; --shadow:#2A1620;
+  --hi:rgba(255,255,255,.6); --lo:rgba(42,22,32,.3); --scan:rgba(42,22,32,.07);
+  --stamp-ok:#2F6B2A; --stamp-bad:#B3261E; --blend:multiply; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#E7D9BF; --bg-glow:#F6EEDC; --ink:#2A1620; --muted:#7A6A5C; --paper:#FBF5E6; --doc:#EFE6C8;
+  --accent:#E8A33D; --on-accent:#2A1620; --line:#B9A88B; --shadow:#2A1620;
+  --hi:rgba(255,255,255,.6); --lo:rgba(42,22,32,.3); --scan:rgba(42,22,32,.07);
+  --stamp-ok:#2F6B2A; --stamp-bad:#B3261E; --blend:multiply; color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background-color:var(--bg);background-image:radial-gradient(ellipse 80% 60% at 50% 25%,var(--bg-glow) 0,var(--bg) 70%);background-attachment:fixed;
+  color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px;min-height:100%}
+body::before{content:"";position:fixed;inset:0;z-index:49;pointer-events:none;background:repeating-linear-gradient(0deg,var(--scan) 0 1px,transparent 1px 3px);opacity:.55}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.page{max-width:1000px;margin:0 auto;display:grid;gap:20px;position:relative;z-index:1}
+
+.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 12px}
+.sw{position:relative;display:grid;grid-template-columns:1fr 1fr;min-width:230px;padding:0;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border:2px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo)}
+.sw .thumb{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);background:var(--accent);border:2px solid var(--ink);transition:transform .15s steps(3)}
+.sw.on .thumb{transform:translateX(100%)}
+.sw .opt{position:relative;z-index:1;padding:6px 12px;text-align:center}
+.sw .opt span{margin-left:6px;opacity:.8}
+.sw:not(.on) .opt-a,.sw.on .opt-b{color:var(--on-accent)}
+.stampline{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.btn{font-weight:600;font-size:14px;padding:5px 12px;background:var(--paper);border:2px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo),3px 3px 0 var(--shadow)}
+.btn:hover{filter:brightness(1.15)}
+.btn:active{transform:translate(2px,2px);box-shadow:inset -2px -2px 0 var(--hi),inset 2px 2px 0 var(--lo),1px 1px 0 var(--shadow)}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--ink)}
+
+.file{background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo),5px 5px 0 var(--shadow);padding:12px;display:grid;gap:12px;min-width:0}
+.file+.file{margin-top:4px}
+.fname{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 12px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.fname h2{margin:0;font-size:19px;font-weight:700;text-wrap:balance}
+.fname .meta{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.fname .right{display:flex;align-items:center;gap:10px}
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px 18px;padding-top:6px}
+.form{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;padding:8px 12px 12px;background:var(--doc);color:var(--ink);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--shadow)}
+.form::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo)}
+.form.orch{--doc:color-mix(in srgb,var(--accent) 16%,var(--paper));border-color:var(--accent);box-shadow:4px 4px 0 var(--shadow),0 0 0 2px var(--ink)}
+.form.orch .fhead{background:var(--accent);color:var(--on-accent);border-bottom-color:var(--ink)}
+.fhead{display:flex;justify-content:space-between;gap:8px;margin:-8px -12px 0;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:3px double var(--ink);background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(60,40,10,.06) 3px 4px)}
+.body{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:start;min-width:0}
+.who{min-width:0}
+.nm{font-weight:700;font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.st.on{color:var(--stamp-ok)} .st.bad{color:var(--stamp-bad)}
+.lab{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px dotted var(--muted);margin-bottom:3px}
+.val{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.val.dim{color:var(--muted)}
+.prog{display:grid;grid-template-columns:1fr 3ch;gap:8px;align-items:center}
+.barbox{height:6px;border:1px solid var(--ink);background:transparent;overflow:hidden}
+.barbox svg{display:block;width:100%;height:100%}
+.pctn{font-size:12px;font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
+.times{font-size:12px;color:var(--muted);min-height:18px;display:flex;justify-content:space-between;gap:8px}
+.stamp{position:absolute;right:10px;bottom:10px;padding:0 10px;font-weight:700;font-size:15px;letter-spacing:.16em;text-transform:uppercase;border:3px double currentColor;transform:rotate(-6deg);mix-blend-mode:var(--blend);pointer-events:none}
+.stamp.bad{color:var(--stamp-bad)}
+.stop{font-size:13px;padding:3px 10px;color:var(--muted);border:2px solid var(--line);background:transparent}
+.stop:hover{color:var(--ink);border-color:var(--ink)}
+.empty{text-align:center;padding:28px 16px;background:var(--paper);border:3px dashed var(--ink)}
+.empty .big{font-size:20px;font-weight:700;margin:0 0 4px}
+.empty p{margin:4px 0;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.sw .thumb{transition:none}}
+</style>
+<div class="page">
+  <header class="top">
+    <button class="sw" id="sw" type="button" role="switch" aria-checked="false" aria-label="Show projects you stopped watching"><span class="thumb"></span><span class="opt opt-a">Watching<span id="nWatch">0</span></span><span class="opt opt-b">Stopped<span id="nStop">0</span></span></button>
+    <span class="stampline" id="stamp">no snapshot yet</span>
+  </header>
+  <main id="main"></main>
+</div>
+<script>
+/*SPRITES*/
+(function(){
+  var projects = {}, db = null, showStopped = false;
+  var $ = function(id){return document.getElementById(id)};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]}); }
+  function ago(t){ if(!t) return 'never'; var m=Math.round((Date.now()-t)/60000); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'; }
+  function formNo(id){ var n=0; for(var k=0;k<id.length;k++) n+=id.charCodeAt(k)*(k+3); return 'A-'+(1000+n%9000); }
+  function norm(m){ return { id:m.id, name:m.name, cls:m.cls, state:m.state, isBlocked:!!m.blocked, task:m.task||undefined,
+    note:m.note||undefined, done:m.done==null?undefined:m.done, total:m.total==null?undefined:m.total,
+    elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, role:m.role }; }
+  function memberHtml(raw){
+    var m = norm(raw), run = m.state==='working';
+    var task = (m.task && m.task!==m.name) ? m.task : (run ? 'working…' : 'no task');
+    var stClass = run ? 'on' : m.isBlocked ? 'bad' : '';
+    var pct = pctOf(m), times = timesOf(m);
+    return '<article class="form'+(m.role==='orchestrator'?' orch':'')+'"><div class="fhead"><span>Agent '+formNo(m.id)+'</span><span>'+(m.role==='orchestrator'?'Orchestrator':'Helper')+'</span></div>'+
+      '<div class="body"><div class="spr">'+spriteSvg(m)+'</div><div class="who"><div class="nm">'+esc(m.name)+'</div><div class="st '+stClass+'">'+esc(statusOf(m).replace(/^! /,''))+'</div></div></div>'+
+      '<div><span class="lab">Task</span><div class="val'+(run||m.task?'':' dim')+'" title="'+esc(task)+'">'+esc(task)+'</div></div>'+
+      '<div><span class="lab">Progress</span><div class="prog"><div class="barbox">'+barSvg(m)+'</div><div class="pctn">'+esc(pct)+'</div></div></div>'+
+      '<div class="times"><span>'+esc(m.note||'')+'</span><span>'+esc(times)+'</span></div>'+
+      (m.isBlocked&&!run?'<div class="stamp bad">Blocked</div>':'')+'</article>';
+  }
+  function setWatching(slug,on){ if(db) db.doc('projects/'+slug).update({watching:on}).catch(function(){}); }
+  function render(){
+    var list = Object.keys(projects).map(function(k){return projects[k]}).sort(function(a,b){return b.working-a.working||a.name.localeCompare(b.name)});
+    var watched=list.filter(function(p){return p.watching!==false}), stopped=list.filter(function(p){return p.watching===false});
+    $('nWatch').textContent=watched.length; $('nStop').textContent=stopped.length;
+    $('sw').classList.toggle('on',showStopped); $('sw').setAttribute('aria-checked',String(showStopped));
+    var newest=0; watched.forEach(function(p){newest=Math.max(newest,p.generatedAt||0)});
+    $('stamp').textContent = newest ? 'updated '+ago(newest) : 'no snapshot yet';
+    var shown = showStopped ? stopped : watched, out='';
+    if(!shown.length){
+      out = '<div class="empty"><p class="big">'+(showStopped?'Nothing stopped':'No project files')+'</p><p>'+
+        (showStopped?'Projects you stop watching wait here until you resume them.':'Ask Claude to refresh the roster.')+'</p></div>';
+    }
+    shown.forEach(function(p){
+      out += '<section class="file" data-slug="'+esc(p.slug)+'"><div class="fname"><div><h2>'+esc(p.name)+'</h2><div class="meta">'+
+        p.working+' of '+p.members.length+' working · updated '+ago(p.generatedAt)+'</div></div><div class="right">'+
+        '<button class="btn stop" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
+        (showStopped ? '' : '<div class="members">'+p.members.map(memberHtml).join('')+'</div>')+'</section>';
+    });
+    $('main').innerHTML = out;
+  }
+  $('sw').onclick=function(){ showStopped=!showStopped; render(); };
+  $('main').addEventListener('click',function(e){
+    var b=e.target.closest('[data-act]'); if(!b) return; var f=b.closest('[data-slug]'); if(!f) return;
+    setWatching(f.getAttribute('data-slug'), b.getAttribute('data-act')==='resume');
+  });
+  window.claude.use('db').then(function(d){
+    if(!d) return; db=d;
+    db.collection('projects').onSnapshot(function(snap){
+      projects={}; snap.docs.forEach(function(x){ projects[x.id]=x.data(); }); render();
+    });
+  });
+  render();
+  setInterval(render,30000);
+})();
+</script>
