@@ -9,7 +9,16 @@ const PANE = 'demo-team-roster'
 const MIN_COLS_GUESS = 32
 const POLL_MS = 4000
 const STEP_TOOL = 'mcp__demo-team-roster__roster_step'
+const SNAP_TOOL = 'mcp__demo-team-roster__team_snapshot'
 const LIST_TOOL = 'mcp__ccd_session_mgmt__list_sessions'
+const SNAP_STATUS: Record<string, string[]> = {
+  done: ['done', 'виконано', 'готово'],
+  working: ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується'],
+  paused: ['paused', 'blocked', 'пауза', 'заблок'],
+  queued: ['pending', 'queued', 'todo', 'new', 'prep-done', 'в черзі', 'очікує'],
+}
+const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => SNAP_STATUS[k]?.some(w => raw.startsWith(w))) ?? (raw ? 'queued' : 'unknown')
+let snapshotRef: (() => Promise<unknown>) | undefined
 
 const members = atom({ plugin: 'demo-team-roster', key: 'members' } as const, [] as Member[])
 const since = atom({ plugin: 'demo-team-roster', key: 'since' } as const, {} as Record<string, number>)
@@ -66,12 +75,18 @@ export const register: Register = on => {
       },
     })
 
+    await $.tool.register({
+      name: 'team_snapshot',
+      description: 'Read-only: every demo project roster under the workspaces folder (members with state and progress, task list) as JSON. Used by the Demo Team Roster dashboard.',
+      inputSchema: { type: 'object', properties: {} },
+    })
+
     const { home, sep } = homeOf($.plugin.root)
     const sessionsRoot = [home, 'AppData', 'Roaming', 'Claude', 'claude-code-sessions'].join(sep)
     const rosterDir = [home, '.claude', 'demo-team-roster'].join(sep)
     const projectsDir = [home, '.claude', 'projects'].join(sep)
     const metaPaths = new Map<string, string>()
-    const taskCache = new Map<string, { mtime: number; title: string; status: string; performer: string }>()
+    const taskCache = new Map<string, { mtime: number; id: string; title: string; status: string; performer: string; priority: string; depends: string }>()
     let wasOpened = false
     let canList = true
     const closedKey = (cwd: string): string => `closed:${cwd}`
@@ -138,6 +153,8 @@ export const register: Register = on => {
             const title = (lines.find(l => l.startsWith('# ')) ?? '').slice(2).trim()
             let status = ''
             let performer = ''
+            let priority = ''
+            let depends = ''
             for (const line of lines) {
               for (const part of line.split('|')) {
                 const i = part.indexOf(':')
@@ -146,9 +163,20 @@ export const register: Register = on => {
                 const val = part.slice(i + 1).trim().toLowerCase()
                 if ((key === 'status' || key === 'статус') && !status) status = val
                 if ((key === 'performer' || key === 'виконавець') && !performer) performer = val
+                if ((key === 'priority' || key === 'пріоритет') && !priority) priority = part.slice(i + 1).trim()
+                if ((key === 'depends on' || key === 'залежить від') && !depends) depends = part.slice(i + 1).trim()
               }
             }
-            c = { mtime: f.mtimeMs, title, status, performer }
+            const colon = title.indexOf(':')
+            c = {
+              mtime: f.mtimeMs,
+              id: (colon > 0 ? title.slice(0, colon) : f.name.replace('.md', '')).slice(0, 22),
+              title: colon > 0 ? title.slice(colon + 1).trim() : title,
+              status,
+              performer,
+              priority,
+              depends,
+            }
             taskCache.set(path, c)
           }
           if (!c.performer.includes(first)) continue
@@ -161,6 +189,94 @@ export const register: Register = on => {
       }
       return res
     }
+
+    const listTasks = async (dir: string) => {
+      const out: { id: string; title: string; priority: string; status: string; performer: string; depends: string }[] = []
+      try {
+        const tdir = [dir, '_orchestration', 'tasks'].join(sep)
+        await tasksFor(dir, '~') // fills the task cache for every file in the folder
+        for (const f of await $.fs.list(tdir)) {
+          if (f.kind !== 'file' || !f.name.endsWith('.md')) continue
+          const c = taskCache.get([tdir, f.name].join(sep))
+          if (!c) continue
+          const dep = c.depends.replace('(', ',').split(',')[0]?.trim() ?? ''
+          out.push({
+            id: c.id,
+            title: c.title.slice(0, 110),
+            priority: c.priority,
+            status: statusClass(c.status),
+            performer: (c.performer.split('.')[0] ?? '').slice(0, 40),
+            depends: ['-', '0', 'none', 'немає'].includes(dep) ? '' : dep.slice(0, 40),
+          })
+        }
+      } catch {
+        // no tasks folder
+      }
+      return out
+    }
+
+    // Every project's roster in one reading: what the dashboard shows live.
+    const seenWorking = new Map<string, number>()
+    const snapshot = async () => {
+      const cwd = String(await $.session.cwd())
+      const at = cwd.toLowerCase().indexOf(`${sep}workspaces`)
+      const cfg = await readJson<{ workspaces?: string }>([rosterDir, 'config.json'].join(sep))
+      const root = cfg?.workspaces ?? (at >= 0 ? cwd.slice(0, at + 11) : cwd)
+      const running = await runningIds()
+      const now = await $.clock.now()
+      const projects: unknown[] = []
+      for (const d of await $.fs.list(root)) {
+        if (d.kind !== 'directory') continue
+        const dir = [root, d.name].join(sep)
+        const roster = await readJson<RosterFile>([dir, '_orchestration', 'roster.json'].join(sep))
+        if (!roster) continue
+        const entries: { e: RosterEntry; role: string }[] = [
+          ...(roster.orchestrator ? [{ e: roster.orchestrator, role: 'orchestrator' }] : []),
+          ...(roster.members ?? []).map(e => ({ e, role: 'helper' })),
+        ]
+        const out: Record<string, unknown>[] = []
+        for (const { e, role } of entries) {
+          const file = await findMeta(e.id)
+          const meta = file ? await readJson<SessionMeta>(file) : undefined
+          const isRun = running ? running.has(e.id) : false
+          const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
+          const tf = await tasksFor(dir, e.name)
+          const fresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
+          const reported = fresh && typeof prog?.total === 'number' && prog.total > 0
+          const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
+          const done = typeof total === 'number' ? Math.min(total, reported ? (prog?.done ?? 0) : tf.done) : undefined
+          if (isRun && !seenWorking.has(e.id)) seenWorking.set(e.id, now)
+          if (!isRun) seenWorking.delete(e.id)
+          const base = prog?.startedAt && fresh ? prog.startedAt : seenWorking.get(e.id)
+          const elapsed = isRun && base ? now - base : undefined
+          const eta = isRun && typeof total === 'number' && done && done > 0 && elapsed !== undefined && total > done ? (elapsed / done) * (total - done) : undefined
+          const summary = meta?.postTurnSummary
+          out.push({
+            id: e.id,
+            name: e.name,
+            role,
+            cls: classOf(e.name, e.class),
+            state: isRun ? 'working' : 'idling',
+            blocked: !isRun && summary?.status_category === 'blocked',
+            task: (fresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail) ?? '',
+            note: (isRun && fresh ? prog?.note : undefined) ?? '',
+            done: done ?? null,
+            total: total ?? null,
+            elapsedMs: elapsed ?? null,
+            etaMs: eta ?? null,
+          })
+        }
+        projects.push({
+          slug: d.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          name: d.name,
+          members: out,
+          working: out.filter(m => m.state === 'working').length,
+          tasks: await listTasks(dir),
+        })
+      }
+      return { generatedAt: now, projects }
+    }
+    snapshotRef = snapshot
 
     const poll = async (): Promise<void> => {
       try {
@@ -237,6 +353,8 @@ export const register: Register = on => {
     void poll()
     return next(e)
   })
+
+  on('tool.call', { tool: SNAP_TOOL }, async () => ({ result: JSON.stringify(snapshotRef ? await snapshotRef() : { generatedAt: 0, projects: [] }) }))
 
   on('command.run', { command: 'team' }, async $ => ({ text: await toggle($) }))
 

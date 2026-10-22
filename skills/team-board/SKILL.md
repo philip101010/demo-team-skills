@@ -20,7 +20,7 @@ Reply in the user's language. Files and commands stay in English.
 
 ## Steps
 
-0. First run only. Publish `<skill dir>/assets/dashboard.html` with the Artifact tool: `capabilities: {"db": {}}`, title "Demo Team Roster", icon `dashboard`, a one-sentence description. Save the returned URL as `{"boardUrl": "<url>"}` in `~/.claude/demo-team-roster/config.json` (create the folder). The board is private to the user; sharing is theirs to do from the Share menu.
+0. First run only. Publish `<skill dir>/assets/dashboard.html` with the Artifact tool: `capabilities: {"db": {}, "mcp": {"servers": [{"server": "host:demo-team-roster", "tools": ["team_snapshot"]}]}}` (the mcp part lets the page read the live roster from the plugin), title "Demo Team Roster", icon `dashboard`, a one-sentence description. Save the returned URL as `{"boardUrl": "<url>"}` in `~/.claude/demo-team-roster/config.json` (create the folder). The board is private to the user; sharing is theirs to do from the Share menu.
 1. Find who is running right now: call `list_sessions` (the session management tool), take the ids with `isRunning: true`, and drop your own session id (`get_session` with `self`): you are running only because of this command, and you will be idle when it ends. Then collect the project document(s) into the scratchpad, never into the project folder:
 
    ```

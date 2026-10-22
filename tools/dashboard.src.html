@@ -39,6 +39,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sw .opt{position:relative;z-index:1;padding:6px 12px;text-align:center}
 .sw .opt span{margin-left:6px;opacity:.8}
 .sw:not(.on) .opt-a,.sw.on .opt-b{color:var(--on-accent)}
+.top .right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.stampline.live{color:var(--stamp-ok)}
 .stampline{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
 .btn{font-weight:600;font-size:14px;padding:5px 12px;background:var(--paper);border:2px solid var(--ink);box-shadow:inset 2px 2px 0 var(--hi),inset -2px -2px 0 var(--lo),3px 3px 0 var(--shadow)}
 .btn:hover{filter:brightness(1.15)}
@@ -93,14 +95,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div class="page">
   <header class="top">
     <button class="sw" id="sw" type="button" role="switch" aria-checked="false" aria-label="Show projects you stopped watching"><span class="thumb"></span><span class="opt opt-a">Watching<span id="nWatch">0</span></span><span class="opt opt-b">Stopped<span id="nStop">0</span></span></button>
-    <span class="stampline" id="stamp">no snapshot yet</span>
+    <span class="right"><span class="stampline" id="stamp">no snapshot yet</span><button class="btn" id="live" type="button" hidden>Go live</button></span>
   </header>
   <main id="main"></main>
 </div>
 <script>
 /*SPRITES*/
 (function(){
-  var projects = {}, db = null, showStopped = false;
+  var projects = {}, db = null, showStopped = false, mcp = null;
+  var live = {}, liveOn = false, liveTimer = null, liveErr = '', liveAt = 0, lastSnap = '', doneOpen = {};
   var $ = function(id){return document.getElementById(id)};
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]}); }
   function ago(t){ if(!t) return 'never'; var m=Math.round((Date.now()-t)/60000); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'; }
@@ -131,16 +134,25 @@ button{font:inherit;color:inherit;cursor:pointer}
     var pc=Math.round(done.length/ts.length*100);
     return '<div class="road"><h3>Roadmap</h3><div class="rsum"><div class="rbar"><i style="width:'+Math.max(2,pc)+'%"></i></div><span>'+done.length+' of '+ts.length+' done</span></div>'+
       (open.length? open.map(taskHtml).join('') : '<div class="none">Everything is done.</div>')+
-      (done.length? '<details><summary>'+done.length+' done</summary>'+done.map(taskHtml).join('')+'</details>' : '')+'</div>';
+      (done.length? '<details data-slug="'+esc(p.slug)+'"'+(doneOpen[p.slug]?' open':'')+'><summary>'+done.length+' done</summary>'+done.map(taskHtml).join('')+'</details>' : '')+'</div>';
   }
   function setWatching(slug,on){ if(db) db.doc('projects/'+slug).update({watching:on}).catch(function(){}); }
   function render(){
-    var list = Object.keys(projects).map(function(k){return projects[k]}).sort(function(a,b){return b.working-a.working||a.name.localeCompare(b.name)});
+    var list = Object.keys(projects).map(function(k){
+      var d = projects[k], l = liveOn && !liveErr && live[d.slug];
+      return l ? Object.assign({}, l, {watching: d.watching, generatedAt: liveAt}) : d;
+    }).sort(function(a,b){return b.working-a.working||a.name.localeCompare(b.name)});
     var watched=list.filter(function(p){return p.watching!==false}), stopped=list.filter(function(p){return p.watching===false});
     $('nWatch').textContent=watched.length; $('nStop').textContent=stopped.length;
     $('sw').classList.toggle('on',showStopped); $('sw').setAttribute('aria-checked',String(showStopped));
     var newest=0; watched.forEach(function(p){newest=Math.max(newest,p.generatedAt||0)});
-    $('stamp').textContent = newest ? 'updated '+ago(newest) : 'no snapshot yet';
+    var st = $('stamp');
+    st.className = 'stampline' + (liveOn && !liveErr ? ' live' : '');
+    st.textContent = liveOn && !liveErr && liveAt ? 'live \u00b7 '+ago(liveAt)
+      : liveOn && liveErr ? 'snapshot \u00b7 live off ('+liveErr+')'
+      : newest ? 'snapshot \u00b7 '+ago(newest) : 'no snapshot yet';
+    $('live').hidden = !mcp;
+    $('live').textContent = liveOn && !liveErr ? 'Stop live' : liveOn ? 'Retry live' : 'Go live';
     var shown = showStopped ? stopped : watched, out='';
     if(!shown.length){
       out = '<div class="empty"><p class="big">'+(showStopped?'Nothing stopped':'No project files')+'</p><p>'+
@@ -158,6 +170,48 @@ button{font:inherit;color:inherit;cursor:pointer}
   $('main').addEventListener('click',function(e){
     var b=e.target.closest('[data-act]'); if(!b) return; var f=b.closest('[data-slug]'); if(!f) return;
     setWatching(f.getAttribute('data-slug'), b.getAttribute('data-act')==='resume');
+  });
+  function snapOf(res){
+    var v = res && res.payload;
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = null; } }
+    if (!v && res && res.content) {
+      for (var i = 0; i < res.content.length && !v; i++) { try { v = JSON.parse(res.content[i].text); } catch (e) { v = null; } }
+    }
+    return v && v.projects ? v : null;
+  }
+  function pollLive(){
+    if (!mcp) return;
+    mcp.callTool('host:demo-team-roster', 'team_snapshot', {}).then(function(res){
+      var snap = snapOf(res);
+      if (!snap) { liveErr = 'unreadable reply'; render(); return; }
+      liveErr = ''; liveAt = snap.generatedAt || Date.now();
+      var key = JSON.stringify(snap.projects.map(function(p){ return [p.slug, p.members, p.tasks]; }));
+      if (key === lastSnap && !liveErr) { render(); return; }
+      lastSnap = key; live = {}; snap.projects.forEach(function(p){ live[p.slug] = p; }); render();
+    }).catch(function(e){
+      liveErr = (e && e.code) || 'error';
+      if (/not_granted|cancelled|denied|not_connected|unavailable/.test(liveErr)) stopLive(true);
+      render();
+    });
+  }
+  function startLive(){
+    if (liveOn) return; liveOn = true; liveErr = '';
+    try { localStorage.setItem('live', '1'); } catch (e) {}
+    pollLive(); liveTimer = setInterval(pollLive, 5000); render();
+  }
+  function stopLive(keepError){
+    liveOn = keepError ? liveOn : false; clearInterval(liveTimer); liveTimer = null;
+    if (!keepError) { try { localStorage.setItem('live', '0'); } catch (e) {} }
+    render();
+  }
+  $('live').onclick = function(){ if (liveOn && !liveErr) stopLive(false); else { liveOn = false; startLive(); } };
+  $('main').addEventListener('toggle', function(e){
+    var d = e.target; if (d && d.tagName === 'DETAILS') doneOpen[d.getAttribute('data-slug')] = d.open;
+  }, true);
+  window.claude.use('mcp').then(function(m){
+    if (!m) return; mcp = m;
+    try { if (localStorage.getItem('live') === '1') startLive(); } catch (e) {}
+    render();
   });
   window.claude.use('db').then(function(d){
     if(!d) return; db=d;
