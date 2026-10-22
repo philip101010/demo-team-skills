@@ -32,6 +32,11 @@ test('the pane draws the team', async ($, on) => {
   on('fs.list', () => ({ value: [{ kind: 'file', name: 'T-11.md', mtimeMs: 1 }] as never }))
   on('fs.exists', () => ({ value: false }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
+  const written: Record<string, string> = {}
+  on('fs.write', (_, e: any) => {
+    written[String(e.path)] = String(e.content ?? e.data ?? e.text ?? '')
+    return { value: undefined }
+  })
   // The list says Gareth is running (his roster entry is `local_g`): a roster file still shows who works.
   on('tool.call', () => ({ result: { text: JSON.stringify([{ sessionId: 'local_g', isRunning: true }]) } }))
 
@@ -45,6 +50,11 @@ test('the pane draws the team', async ($, on) => {
   const alts = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.alt))
   expect(alts.some(a => a.startsWith('Gareth') && a.includes('working'))).toBe(true)
   expect(alts.some(a => a.startsWith('Lamorak') && a.includes('idling'))).toBe(true)
+  // The pane publishes what it shows, so the dashboard can read it from any chat.
+  const live = Object.entries(written).find(([path]) => path.includes('live-'))
+  expect(live).toBeDefined()
+  expect(live?.[1].includes('Gareth')).toBe(true)
+  expect(live?.[1].includes('working')).toBe(true)
   await ui.unmount()
 
   // Wider panes put two or three to a row; the widths must stay ones the engine accepts.

@@ -426,17 +426,26 @@ const tileHtml = (m        )         => {
   }
   function setWatching(slug,on){ if(db) db.doc('projects/'+slug).update({watching:on}).catch(function(){}); }
   function render(){
-    var list = Object.keys(projects).map(function(k){
-      var d = projects[k], l = liveOn && !liveErr && live[d.slug];
-      return l ? Object.assign({}, l, {watching: d.watching, generatedAt: liveAt}) : d;
+    // Each project shows its newest data: a published live file when there is a newer one than the saved
+    // snapshot, else the snapshot. "Fresh" means the live file was written a moment before the last read.
+    var keys = {};
+    Object.keys(projects).forEach(function(k){ keys[k]=1; });
+    if (liveOn && !liveErr) Object.keys(live).forEach(function(k){ keys[k]=1; });
+    var list = Object.keys(keys).map(function(k){
+      var d = projects[k], l = liveOn && !liveErr && live[k];
+      if (l && (!d || (l.generatedAt||0) >= (d.generatedAt||0))) {
+        return Object.assign({}, l, {watching: d ? d.watching : true, fresh: liveAt - (l.generatedAt||0) < 45000});
+      }
+      return Object.assign({}, d, {fresh: false});
     }).sort(function(a,b){return b.working-a.working||a.name.localeCompare(b.name)});
     var watched=list.filter(function(p){return p.watching!==false}), stopped=list.filter(function(p){return p.watching===false});
     $('nWatch').textContent=watched.length; $('nStop').textContent=stopped.length;
     $('sw').classList.toggle('on',showStopped); $('sw').setAttribute('aria-checked',String(showStopped));
     var newest=0; watched.forEach(function(p){newest=Math.max(newest,p.generatedAt||0)});
     var st = $('stamp');
-    st.className = 'stampline' + (liveOn && !liveErr ? ' live' : '');
-    st.textContent = liveOn && !liveErr && liveAt ? 'Live · '+ago(liveAt)
+    var nFresh = list.filter(function(p){return p.fresh}).length;
+    st.className = 'stampline' + (liveOn && !liveErr && nFresh ? ' live' : '');
+    st.textContent = liveOn && !liveErr && liveAt ? (nFresh ? 'Live · '+nFresh+' of '+list.length+' updating' : 'Live read · no project is updating now')
       : liveOn && liveErr ? 'Snapshot · live off ('+liveErr+')'
       : newest ? 'Snapshot · '+ago(newest) : 'No snapshot yet';
     $('live').hidden = !mcp;
@@ -448,7 +457,7 @@ const tileHtml = (m        )         => {
     }
     shown.forEach(function(p){
       out += '<section class="file" data-slug="'+esc(p.slug)+'"><div class="fname"><div><h2>'+esc(p.name)+'</h2><div class="meta">'+
-        p.working+' of '+p.members.length+' working · updated '+ago(p.generatedAt)+'</div></div><div class="right">'+
+        p.working+' of '+p.members.length+' working · '+(p.fresh ? 'live' : 'updated '+ago(p.generatedAt))+'</div></div><div class="right">'+
         (showStopped ? '' : '<span class="mini" title="Roadmap '+roadPct(p)+'% done"><i style="width:'+roadPct(p)+'%"></i></span>')+
         '<button class="btn stop" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
         (showStopped ? '' : '<div class="cols"><div class="members">'+p.members.map(memberHtml).join('')+'</div>'+roadHtml(p)+'</div>')+'</section>';

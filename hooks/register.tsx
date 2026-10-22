@@ -288,6 +288,41 @@ const makeTools = ($: any) => {
     return out
   }
 
+  // The pane of a watching chat writes what it shows, one file per project, so the dashboard reads those
+  // (a chat cannot read the other projects' folders itself).
+  const slugOf = (name: string): string => {
+    const plain = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    if (plain) return plain
+    let h = 0
+    for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 1000003
+    return 'p' + h
+  }
+  const lastLive = new Map<string, { key: string; at: number }>()
+  const publishLive = async (dir: string, members: Record<string, unknown>[]): Promise<void> => {
+    const name = dir.slice(dir.lastIndexOf(sep) + 1)
+    const slug = slugOf(name)
+    const now = Number(await $.clock.now())
+    const project = { slug, name, members, working: members.filter(m => m.state === 'working').length, tasks: await listTasks(dir) }
+    const key = JSON.stringify(project)
+    const prev = lastLive.get(slug)
+    if (prev && prev.key === key && now - prev.at < 8000) return
+    lastLive.set(slug, { key, at: now })
+    await $.fs.write([rosterDir, `live-${slug}.json`].join(sep), JSON.stringify({ ...project, generatedAt: now }))
+  }
+  const readLive = async (): Promise<{ slug: string; generatedAt?: number }[]> => {
+    const out: { slug: string; generatedAt?: number }[] = []
+    try {
+      for (const f of await $.fs.list(rosterDir)) {
+        if (f.kind !== 'file' || !f.name.startsWith('live-') || !f.name.endsWith('.json')) continue
+        const p = await readJson<{ slug: string; generatedAt?: number }>([rosterDir, f.name].join(sep))
+        if (p?.slug) out.push(p)
+      }
+    } catch {
+      // nothing published yet
+    }
+    return out
+  }
+
   // Every project's roster in one reading: what the dashboard shows live.
   const snapshot = async () => {
     const cwd = String(await $.session.cwd())
@@ -296,59 +331,69 @@ const makeTools = ($: any) => {
     const root = cfg?.workspaces ?? (at >= 0 ? cwd.slice(0, at + 11) : [cwd.slice(0, Math.max(cwd.lastIndexOf(sep), 0)), 'Workspaces'].join(sep))
     const running = await runningIds()
     const now = await $.clock.now()
-    const projects: unknown[] = []
-    for (const d of await $.fs.list(root)) {
-      if (d.kind !== 'directory') continue
-      const dir = [root, d.name].join(sep)
-      const roster = await readJson<RosterFile>([dir, '_orchestration', 'roster.json'].join(sep))
-      if (!roster) continue
-      const entries: { e: RosterEntry; role: string }[] = [
-        ...(roster.orchestrator ? [{ e: roster.orchestrator, role: 'orchestrator' }] : []),
-        ...(roster.members ?? []).map(e => ({ e, role: 'helper' })),
-      ]
-      const out: Record<string, unknown>[] = []
-      for (const { e, role } of entries) {
-        const file = await findMeta(e.id)
-        const meta = file ? await readJson<SessionMeta>(file) : undefined
-        const isRun = running ? running.has(e.id) : false
-        const prog = await progressFor(e.id, meta)
-        const tf = await tasksFor(dir, e.name)
-        const fresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
-        const reported = fresh && typeof prog?.total === 'number' && prog.total > 0
-        const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
-        const done = typeof total === 'number' ? Math.min(total, reported ? (prog?.done ?? 0) : tf.done) : undefined
-        if (isRun && !seenWorking.has(e.id)) seenWorking.set(e.id, now)
-        if (!isRun) seenWorking.delete(e.id)
-        const base = prog?.startedAt && fresh ? prog.startedAt : seenWorking.get(e.id)
-        const elapsed = isRun && base ? now - base : undefined
-        const eta = isRun && typeof total === 'number' && done && done > 0 && elapsed !== undefined && total > done ? (elapsed / done) * (total - done) : undefined
-        const summary = meta?.postTurnSummary
-        out.push({
-          id: e.id,
-          name: e.name,
-          role,
-          cls: classOf(e.name, e.class),
-          state: isRun ? 'working' : 'idling',
-          blocked: !isRun && summary?.status_category === 'blocked',
-          task: (fresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail) ?? '',
-          note: (isRun && fresh ? prog?.note : undefined) ?? '',
-          done: done ?? null,
-          total: total ?? null,
-          elapsedMs: elapsed ?? null,
-          etaMs: eta ?? null,
-        })
+    const projects: { slug: string; generatedAt?: number }[] = []
+    try {
+      for (const d of await $.fs.list(root)) {
+        if (d.kind !== 'directory') continue
+        const dir = [root, d.name].join(sep)
+        const roster = await readJson<RosterFile>([dir, '_orchestration', 'roster.json'].join(sep))
+        if (!roster) continue
+        const entries: { e: RosterEntry; role: string }[] = [
+          ...(roster.orchestrator ? [{ e: roster.orchestrator, role: 'orchestrator' }] : []),
+          ...(roster.members ?? []).map(e => ({ e, role: 'helper' })),
+        ]
+        const out: Record<string, unknown>[] = []
+        for (const { e, role } of entries) {
+          const file = await findMeta(e.id)
+          const meta = file ? await readJson<SessionMeta>(file) : undefined
+          const isRun = running ? running.has(e.id) : false
+          const prog = await progressFor(e.id, meta)
+          const tf = await tasksFor(dir, e.name)
+          const fresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
+          const reported = fresh && typeof prog?.total === 'number' && prog.total > 0
+          const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
+          const done = typeof total === 'number' ? Math.min(total, reported ? (prog?.done ?? 0) : tf.done) : undefined
+          if (isRun && !seenWorking.has(e.id)) seenWorking.set(e.id, now)
+          if (!isRun) seenWorking.delete(e.id)
+          const base = prog?.startedAt && fresh ? prog.startedAt : seenWorking.get(e.id)
+          const elapsed = isRun && base ? now - base : undefined
+          const eta = isRun && typeof total === 'number' && done && done > 0 && elapsed !== undefined && total > done ? (elapsed / done) * (total - done) : undefined
+          const summary = meta?.postTurnSummary
+          out.push({
+            id: e.id,
+            name: e.name,
+            role,
+            cls: classOf(e.name, e.class),
+            state: isRun ? 'working' : 'idling',
+            blocked: !isRun && summary?.status_category === 'blocked',
+            task: (fresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail) ?? '',
+            note: (isRun && fresh ? prog?.note : undefined) ?? '',
+            done: done ?? null,
+            total: total ?? null,
+            elapsedMs: elapsed ?? null,
+            etaMs: eta ?? null,
+          })
+        }
+        projects.push({
+          slug: slugOf(d.name),
+          generatedAt: now,
+          name: d.name,
+          members: out,
+          working: out.filter(m => m.state === 'working').length,
+          tasks: await listTasks(dir),
+        } as { slug: string; generatedAt?: number })
       }
-      projects.push({
-        slug: d.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-        name: d.name,
-        members: out,
-        working: out.filter(m => m.state === 'working').length,
-        tasks: await listTasks(dir),
-      })
+    } catch {
+      // the other projects' folders are not readable from here: the published files carry them
     }
-    return { generatedAt: now, projects }
+    const bySlug = new Map<string, { slug: string; generatedAt?: number }>()
+    for (const p of [...(await readLive()), ...projects]) {
+      const old = bySlug.get(p.slug)
+      if (!old || (p.generatedAt ?? 0) >= (old.generatedAt ?? 0)) bySlug.set(p.slug, p)
+    }
+    return { generatedAt: now, projects: [...bySlug.values()] }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds: () => linkedRunning, progressFor, runningIds, tasksFor, snapshot, diag }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds: () => linkedRunning, progressFor, runningIds, tasksFor, snapshot, publishLive, diag }
 }
 
 export const register: Register = on => {
@@ -375,7 +420,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor, publishLive } = makeTools($)
     let wasOpened = false
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
@@ -444,6 +489,28 @@ export const register: Register = on => {
         // not a listed helper (a fork or a resumed copy of the orchestrator has a new session id).
         const isWatcher = selfRole !== 'member'
         await update($, isOrch, () => isWatcher)
+        // A project folder (a roster file, or a folder under Workspaces): publish what this pane shows.
+        const projDir = fromFile ? projectDir : cwd.toLowerCase().includes(`${sep}workspaces${sep}`) ? cwd : undefined
+        if (isWatcher && projDir) {
+          const lead = roster.orchestrator?.id
+          await publishLive(
+            projDir,
+            out.map((m, i) => ({
+              id: m.id,
+              name: m.name,
+              role: entries[i]?.id === lead ? 'orchestrator' : 'helper',
+              cls: m.cls,
+              state: m.state,
+              blocked: m.isBlocked,
+              task: m.task ?? '',
+              note: m.note ?? '',
+              done: m.done ?? null,
+              total: m.total ?? null,
+              elapsedMs: m.elapsedMs ?? null,
+              etaMs: m.etaMs ?? null,
+            })),
+          )
+        }
         if (!wasOpened && out.length > 0 && isWatcher && !(await $.store.get(closedKey(cwd)))) {
           wasOpened = true
           void $.ui.open({ id: PANE, title: 'Team' })
