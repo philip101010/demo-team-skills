@@ -148,17 +148,21 @@ const makeTools = ($: any) => {
   const linkedRoster = async (): Promise<RosterFile | undefined> => {
     try {
       const me = await $.tool.call({ tool: GET_TOOL, session_id: 'self' } as never)
-      const selfLocal = (JSON.parse(textOf(me) || '{}') as { sessionId?: string }).sessionId
+      const mine = JSON.parse(textOf(me) || '{}') as { sessionId?: string; title?: string }
+      const selfLocal = mine.sessionId
       if (!selfLocal) return undefined
+      // The lead carries this chat's own name ("Merlin TL (orchestrator, SGH)" is Merlin TL).
+      const selfName = (mine.title ?? '').split(' (')[0]?.trim() || 'Lead'
       const res = await $.tool.call({ tool: LIST_TOOL, linked: true, limit: 100 } as never)
       const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; title?: string; name?: string; cwd?: string; startedBy?: string; isArchived?: boolean; isRunning?: boolean }[]
-      const helpers = rows.filter(r => r.startedBy === selfLocal && !r.isArchived)
+      // A fork of the lead has the lead's own title: it is another view of the lead, not a helper.
+      const helpers = rows.filter(r => r.startedBy === selfLocal && !r.isArchived && (!mine.title || r.title !== mine.title))
       if (helpers.length === 0) return undefined
       // The same list says who is running right now.
       linkedRunning = new Set(helpers.filter(r => r.isRunning).map(r => r.sessionId))
       const nameOf = (r: { title?: string; name?: string }): string => (r.title ? r.title.split(' (')[0] : (r.name ?? 'helper')) ?? 'helper'
       return {
-        orchestrator: { name: 'Lead', id: selfLocal, class: 'king' },
+        orchestrator: { name: selfName, id: selfLocal, class: 'king' },
         // The list is ordered by recent activity; a fixed order (by name) keeps the knights in place.
         members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId, cwd: r.cwd })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
       }

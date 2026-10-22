@@ -10,6 +10,7 @@ const PANE = {
 const ROWS = [
   { sessionId: 'local_k', title: 'Kei (Test)', name: 'kei', startedBy: 'local_me', isRunning: true },
   { sessionId: 'local_x', title: 'Other (Test)', name: 'other', startedBy: 'local_else', isRunning: false },
+  { sessionId: 'local_f', title: 'Boss (Test)', name: 'boss-fork', startedBy: 'local_me', isRunning: false },
   { sessionId: 'local_a', title: 'Old (Test)', name: 'old', startedBy: 'local_me', isArchived: true },
 ]
 
@@ -30,15 +31,17 @@ test('without a roster file the pane lists the chats this chat started', async (
   on('fs.exists', () => ({ value: false }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
   on('tool.call', (_, e: any) => ({
-    result: { text: e.session_id === 'self' || e.input?.session_id === 'self' ? JSON.stringify({ sessionId: 'local_me' }) : JSON.stringify(ROWS) },
+    result: { text: e.session_id === 'self' || e.input?.session_id === 'self' ? JSON.stringify({ sessionId: 'local_me', title: 'Boss (Test)' }) : JSON.stringify(ROWS) },
   }))
 
   await $.session.start({ cwd: 'C:\work', surface: 'desktop', isInteractive: true })
   await new Promise(r => setTimeout(r, 200))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const cards = (await ui.findAll({ type: 'Svg' })).map(c => ({ alt: String(c.props.alt), source: String(c.props.source) }))
-  // The lead and the one helper this chat started; the other chats of the list are not in the team.
+  // The lead (named as this chat is) and the one helper this chat started; a fork of the lead and the
+  // other chats of the list are not in the team.
   expect(cards.length).toBe(2)
+  expect(cards.some(c => c.source.includes('>Boss<'))).toBe(true)
   const kei = cards.find(c => c.source.includes('>Kei<'))
   expect(kei).toBeDefined()
   // Kei is running in the same list, so no second call is needed to know it.
