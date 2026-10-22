@@ -32,7 +32,8 @@ test('the pane draws the team', async ($, on) => {
   on('fs.list', () => ({ value: [{ kind: 'file', name: 'T-11.md', mtimeMs: 1 }] as never }))
   on('fs.exists', () => ({ value: false }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
-  on('tool.call', () => ({ result: { text: '[]' } }))
+  // The list says Gareth is running (his roster entry is `local_g`): a roster file still shows who works.
+  on('tool.call', () => ({ result: { text: JSON.stringify([{ sessionId: 'local_g', isRunning: true }]) } }))
 
   await $.session.start({ cwd: 'C:\proj', surface: 'desktop', isInteractive: true })
   await new Promise(r => setTimeout(r, 200))
@@ -41,6 +42,9 @@ test('the pane draws the team', async ($, on) => {
   const cards = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.source))
   expect(cards.some(s => s.includes('>Gareth<'))).toBe(true)
   expect(cards.some(s => s.includes('>—<'))).toBe(true)
+  const alts = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.alt))
+  expect(alts.some(a => a.startsWith('Gareth') && a.includes('working'))).toBe(true)
+  expect(alts.some(a => a.startsWith('Lamorak') && a.includes('idling'))).toBe(true)
   await ui.unmount()
 
   // Wider panes put two or three to a row; the widths must stay ones the engine accepts.

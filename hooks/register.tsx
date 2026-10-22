@@ -114,20 +114,26 @@ const makeTools = ($: any) => {
   const runningIds = async (): Promise<Set<string> | undefined> => {
     const now = Number(await $.clock.now())
     if (!canList && now - listFailedAt < 20000) return undefined
-    try {
-      const res = await $.tool.call({ tool: LIST_TOOL, limit: 100 } as never)
-      const text = textOf(res) || '[]'
-      if (!text.trimStart().startsWith('[')) throw new Error(text.slice(0, 70))
-      const rows = JSON.parse(text) as { sessionId: string; isRunning?: boolean }[]
-      canList = true
-      diag.listError = ''
-      return new Set(rows.filter(r => r.isRunning).map(r => r.sessionId))
-    } catch (error) {
-      canList = false
-      listFailedAt = now
-      diag.listError = String((error as Error)?.message ?? error).slice(0, 60)
-      return undefined
+    // Two reads, either may fail: the chats of this chat's own family (a short list), and the latest chats
+    // overall (kept short: a list of 100 came back as an error text, too big to return). A running chat is
+    // among the latest, so a short list sees it.
+    const running = new Set<string>()
+    let isRead = false
+    let lastError = ''
+    for (const args of [{ linked: true, limit: 100 }, { limit: 25 }]) {
+      try {
+        const text = textOf(await $.tool.call({ tool: LIST_TOOL, ...args } as never)) || '[]'
+        if (!text.trimStart().startsWith('[')) throw new Error(text.slice(0, 70))
+        for (const r of JSON.parse(text) as { sessionId: string; isRunning?: boolean }[]) if (r.isRunning) running.add(r.sessionId)
+        isRead = true
+      } catch (error) {
+        lastError = String((error as Error)?.message ?? error).slice(0, 60)
+      }
     }
+    canList = isRead
+    if (!isRead) listFailedAt = now
+    diag.listError = isRead ? '' : lastError
+    return isRead ? running : undefined
   }
 
   // A tool call comes back as text, or wrapped in a result; take whichever is there.
