@@ -13,6 +13,7 @@ const SNAP_TOOL = 'mcp__demo-team-roster__team_snapshot'
 const PROGRESS_RULE =
   'This project has a team roster (_orchestration/roster.json) that a Team widget and a dashboard show live. Report your own progress with the roster_step tool. It is a deferred tool: load its schema first with ToolSearch (query "select:mcp__demo-team-roster__roster_step"), then call it when you start a task (task = short title, done = 0, total = the number of steps you plan) and after each finished step (done, note = what you do next). Do this before your first real action on a task. Skip it only for one-step work.'
 const LIST_TOOL = 'mcp__ccd_session_mgmt__list_sessions'
+const GET_TOOL = 'mcp__ccd_session_mgmt__get_session'
 const SNAP_STATUS: Record<string, string[]> = {
   done: ['done', 'виконано', 'готово'],
   working: ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується'],
@@ -103,11 +104,39 @@ const makeTools = ($: any) => {
   const runningIds = async (): Promise<Set<string> | undefined> => {
     if (!canList) return undefined
     try {
-      const res = (await $.tool.call({ tool: LIST_TOOL, limit: 100 } as never)) as { text?: string }
-      const rows = JSON.parse(res.text ?? '[]') as { sessionId: string; isRunning?: boolean }[]
+      const res = await $.tool.call({ tool: LIST_TOOL, limit: 100 } as never)
+      const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; isRunning?: boolean }[]
       return new Set(rows.filter(r => r.isRunning).map(r => r.sessionId))
     } catch {
       canList = false
+      return undefined
+    }
+  }
+
+  // A tool call comes back as text, or wrapped in a result; take whichever is there.
+  const textOf = (res: unknown): string => {
+    const r = res as { text?: string; result?: { text?: string } | string } | string | undefined
+    if (typeof r === 'string') return r
+    const inner = r?.result
+    return r?.text ?? (typeof inner === 'string' ? inner : inner?.text) ?? ''
+  }
+
+  // No roster file: the team is the chats this chat started (its helper sub-sessions), read live from the app.
+  const linkedRoster = async (): Promise<RosterFile | undefined> => {
+    try {
+      const me = await $.tool.call({ tool: GET_TOOL, session_id: 'self' } as never)
+      const selfLocal = (JSON.parse(textOf(me) || '{}') as { sessionId?: string }).sessionId
+      if (!selfLocal) return undefined
+      const res = await $.tool.call({ tool: LIST_TOOL, linked: true, limit: 100 } as never)
+      const rows = JSON.parse(textOf(res) || '[]') as { sessionId: string; title?: string; name?: string; startedBy?: string; isArchived?: boolean }[]
+      const helpers = rows.filter(r => r.startedBy === selfLocal && !r.isArchived)
+      if (helpers.length === 0) return undefined
+      const nameOf = (r: { title?: string; name?: string }): string => (r.title ? r.title.split(' (')[0] : (r.name ?? 'helper')) ?? 'helper'
+      return {
+        orchestrator: { name: 'Lead', id: selfLocal, class: 'king' },
+        members: helpers.map(r => ({ name: nameOf(r), id: r.sessionId })),
+      }
+    } catch {
       return undefined
     }
   }
@@ -289,7 +318,7 @@ const makeTools = ($: any) => {
     }
     return { generatedAt: now, projects }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, runningIds, tasksFor, snapshot }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor, snapshot }
 }
 
 export const register: Register = on => {
@@ -316,7 +345,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, runningIds, tasksFor } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, runningIds, tasksFor } = makeTools($)
     let wasOpened = false
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
@@ -325,8 +354,8 @@ export const register: Register = on => {
         const cwd = await $.session.cwd()
         const selfCli = await $.session.id()
         const projectDir = await findRosterDir(cwd, selfCli)
-        const roster = projectDir ? await readJson<RosterFile>([projectDir, '_orchestration', 'roster.json'].join(sep)) : undefined
-        if (!projectDir || !roster) {
+        const roster = (projectDir ? await readJson<RosterFile>([projectDir, '_orchestration', 'roster.json'].join(sep)) : undefined) ?? (await linkedRoster())
+        if (!roster) {
           await update($, members, () => [])
           return
         }
@@ -351,7 +380,7 @@ export const register: Register = on => {
           const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
           if (isRun && !nextSince[entry.id]) nextSince[entry.id] = now
           if (!isRun) delete nextSince[entry.id]
-          const tf = await tasksFor(meta?.cwd ?? projectDir, entry.name)
+          const tf = await tasksFor(meta?.cwd ?? projectDir ?? cwd, entry.name)
           const isFresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
           // The helper's own reports win; without them the bar is its task files: done of its own.
           const reported = isFresh && typeof prog?.total === 'number' && prog.total > 0
