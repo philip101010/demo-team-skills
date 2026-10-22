@@ -112,6 +112,42 @@ const makeTools = ($: any) => {
     }
   }
 
+  // The project folder whose roster lists this chat. Its own folder first; a chat opened elsewhere
+  // (the orchestrator in a work folder) is found by id among the projects next to it and under the workspaces root.
+  const rosterAt = (dir: string): string => [dir, '_orchestration', 'roster.json'].join(sep)
+  let foundDir: { selfId: string; dir?: string; at: number } | undefined
+  const findRosterDir = async (cwd: string, selfId: string): Promise<string | undefined> => {
+    if (await readJson<RosterFile>(rosterAt(cwd))) return cwd
+    const now = await $.clock.now()
+    if (foundDir && foundDir.selfId === selfId && (foundDir.dir ? !!(await readJson<RosterFile>(rosterAt(foundDir.dir))) : now - foundDir.at < 30000)) return foundDir.dir
+    const cfg = await readJson<{ workspaces?: string }>([rosterDir, 'config.json'].join(sep))
+    const parent = cwd.slice(0, Math.max(cwd.lastIndexOf(sep), 0))
+    const roots = [cfg?.workspaces, parent, parent ? [parent, 'Workspaces'].join(sep) : undefined].filter((r, i, all): r is string => !!r && all.indexOf(r) === i)
+    let dir: string | undefined
+    scan: for (const root of roots) {
+      try {
+        for (const d of await $.fs.list(root)) {
+          if (d.kind !== 'directory') continue
+          const candidate = [root, d.name].join(sep)
+          const roster = await readJson<RosterFile>(rosterAt(candidate))
+          if (!roster) continue
+          for (const entry of [...(roster.orchestrator ? [roster.orchestrator] : []), ...(roster.members ?? [])]) {
+            const file = await findMeta(entry.id)
+            const meta = file ? await readJson<SessionMeta>(file) : undefined
+            if (meta?.cliSessionId === selfId) {
+              dir = candidate
+              break scan
+            }
+          }
+        }
+      } catch {
+        // root not readable: try the next one
+      }
+    }
+    foundDir = { selfId, dir, at: now }
+    return dir
+  }
+
   // What the task files say about a helper: its current task and how many of its tasks are done.
   // Header lines are 'Key: value', or several of them on one line separated by '|'.
   const ACTIVE = ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується']
@@ -198,7 +234,7 @@ const makeTools = ($: any) => {
     const cwd = String(await $.session.cwd())
     const at = cwd.toLowerCase().indexOf(`${sep}workspaces`)
     const cfg = await readJson<{ workspaces?: string }>([rosterDir, 'config.json'].join(sep))
-    const root = cfg?.workspaces ?? (at >= 0 ? cwd.slice(0, at + 11) : cwd)
+    const root = cfg?.workspaces ?? (at >= 0 ? cwd.slice(0, at + 11) : [cwd.slice(0, Math.max(cwd.lastIndexOf(sep), 0)), 'Workspaces'].join(sep))
     const running = await runningIds()
     const now = await $.clock.now()
     const projects: unknown[] = []
@@ -253,7 +289,7 @@ const makeTools = ($: any) => {
     }
     return { generatedAt: now, projects }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, runningIds, tasksFor, snapshot }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, runningIds, tasksFor, snapshot }
 }
 
 export const register: Register = on => {
@@ -280,20 +316,21 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, runningIds, tasksFor } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, runningIds, tasksFor } = makeTools($)
     let wasOpened = false
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
     const poll = async (): Promise<void> => {
       try {
         const cwd = await $.session.cwd()
-        const roster = await readJson<RosterFile>([cwd, '_orchestration', 'roster.json'].join(sep))
-        if (!roster) {
+        const selfCli = await $.session.id()
+        const projectDir = await findRosterDir(cwd, selfCli)
+        const roster = projectDir ? await readJson<RosterFile>([projectDir, '_orchestration', 'roster.json'].join(sep)) : undefined
+        if (!projectDir || !roster) {
           await update($, members, () => [])
           return
         }
         const entries: RosterEntry[] = [...(roster.orchestrator ? [roster.orchestrator] : []), ...(roster.members ?? [])]
-        const selfCli = await $.session.id()
         let selfRole: 'orchestrator' | 'member' | 'outsider' = 'outsider'
         const running = await runningIds()
         const now = await $.clock.now()
@@ -314,7 +351,7 @@ export const register: Register = on => {
           const prog = meta?.cliSessionId ? await readJson<Progress>([rosterDir, `${meta.cliSessionId}.json`].join(sep)) : undefined
           if (isRun && !nextSince[entry.id]) nextSince[entry.id] = now
           if (!isRun) delete nextSince[entry.id]
-          const tf = await tasksFor(meta?.cwd ?? cwd, entry.name)
+          const tf = await tasksFor(meta?.cwd ?? projectDir, entry.name)
           const isFresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
           // The helper's own reports win; without them the bar is its task files: done of its own.
           const reported = isFresh && typeof prog?.total === 'number' && prog.total > 0
