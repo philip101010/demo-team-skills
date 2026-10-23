@@ -37,6 +37,7 @@ Each brief ends with: read-only, do not create/compile/restart, report path, mes
 ```
 # STATE: <NAME>
 PROJECT block (see above)
+Protocol: 2
 Team: orchestrator <name> (<id>), helpers <name> (<id>), ...
 Stage: <intake | wave 0 | roadmap approval | build wave N | integration | verification | handover | paused>
 Status: <phase> | Updated: <date time>

@@ -80,5 +80,86 @@ class KbTest(unittest.TestCase):
         self.assertIn("tool 1", text)
 
 
+GOOD = """# T-01: A good task
+Status: done | Performer: Kei | Priority: P1
+Wave: 1 | Estimate: 1 | Type: page | Risk: low | Started: 2026-10-23 09:00 | Finished: 2026-10-23 10:00
+## Understanding
+Build the page as described.
+## Acceptance
+- [x] the page opens (evidence: screenshot)
+## Evidence
+- screenshot t01.png
+## Review
+- 2026-10-23 10:30 done: Verified by Lancelot
+"""
+
+
+class LintTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.project = os.path.join(self.tmp.name, "P")
+        self.tdir = os.path.join(self.project, "_orchestration", "tasks")
+        os.makedirs(self.tdir)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, name, text):
+        with open(os.path.join(self.tdir, name), "w", encoding="utf-8") as f:
+            f.write(text)
+        return os.path.join(self.tdir, name)
+
+    def codes(self, name, text):
+        return {c for _, c, _ in kb.lint_task(self.write(name, text))}
+
+    def test_a_good_task_has_no_findings(self):
+        self.assertEqual(kb.lint_task(self.write("T-01.md", GOOD)), [])
+
+    def test_done_without_verification_and_self_verification(self):
+        self.assertIn("unverified", self.codes("T-02.md", GOOD.replace("Verified by Lancelot", "ok")))
+        self.assertIn("self-verified", self.codes("T-03.md", GOOD.replace("Verified by Lancelot", "Verified by Kei")))
+
+    def test_unticked_boxes_and_empty_evidence(self):
+        self.assertIn("unticked", self.codes("T-04.md", GOOD.replace("[x]", "[ ]")))
+        review = GOOD.replace("Status: done", "Status: review").replace("- screenshot t01.png", "")
+        self.assertIn("no-evidence", self.codes("T-05.md", review))
+
+    def test_high_risk_needs_an_approved_plan(self):
+        risky = GOOD.replace("Risk: low", "Risk: high")
+        self.assertEqual({"no-plan-approval", "no-plan"}, self.codes("T-06.md", risky) & {"no-plan-approval", "no-plan"})
+        planned = risky.replace("## Acceptance", "## Plan\n1. do it\nPlan approved: 2026-10-23\n## Acceptance")
+        self.assertNotIn("no-plan-approval", self.codes("T-07.md", planned))
+        self.assertNotIn("no-plan", self.codes("T-07.md", planned))
+
+    def test_missing_estimate_acceptance_and_blocker(self):
+        todo = "# T-08: Open task\nStatus: todo | Performer: Kei\n## Acceptance\nsomething vague\n"
+        self.assertEqual({"no-estimate", "no-acceptance"}, self.codes("T-08.md", todo) & {"no-estimate", "no-acceptance"})
+        blocked = GOOD.replace("Status: done", "Status: blocked-approval")
+        self.assertIn("no-blocker", self.codes("T-09.md", blocked))
+        self.assertNotIn("no-blocker", self.codes("T-09.md", blocked.replace("Priority: P1", "Priority: P1 | Blocker: needs the compile approval")))
+
+    def run_lint(self, *extra):
+        out = io.StringIO()
+        code = 0
+        with contextlib.redirect_stdout(out):
+            try:
+                kb.lint(["--project", self.project, *extra])
+            except SystemExit as e:
+                code = e.code
+        return code, out.getvalue()
+
+    def test_strict_projects_fail_and_legacy_ones_only_warn(self):
+        self.write("T-02.md", GOOD.replace("Verified by Lancelot", "ok"))
+        code, text = self.run_lint()
+        self.assertEqual(code, 0)
+        self.assertIn("legacy project", text)
+        self.assertIn("warn  T-02 [unverified]", text)
+        with open(os.path.join(self.project, "_orchestration", "STATE.md"), "w", encoding="utf-8") as f:
+            f.write("Protocol: 2\n")
+        code, text = self.run_lint()
+        self.assertEqual(code, 1)
+        self.assertIn("ERROR T-02 [unverified]", text)
+
+
 if __name__ == "__main__":
     unittest.main()

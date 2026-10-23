@@ -4,6 +4,8 @@ Usage (stdlib only, run with python -I):
   kb.py harvest [--root DIR | --project DIR] [--kb DIR]   read the task files, update tasks.jsonl
   kb.py predict --type T [--guess HOURS] [--kb DIR]        what history says about a task of this type
   kb.py calibrate [--kb DIR]                               per type: size, estimate error, rework and first-pass rate
+  kb.py lint --project DIR [--strict]                      task files against the protocol (exit 1 on errors in a
+                                                           'Protocol: 2' project): verification, evidence, plan gate, ...
 
 The base lives in ~/.claude/demo-team-roster/knowledge/ (tasks.jsonl, and LESSONS.md written by hand).
 Task files are read, never changed. Headers are 'Key: value' lines or 'A: x | B: y' on one line,
@@ -231,10 +233,126 @@ def calibrate(args):
         print("\nrework causes: " + ", ".join(f"{c} {n}" for c, n in sorted(causes.items(), key=lambda x: -x[1])))
 
 
+SECTION_ALIASES = ("understanding", "plan", "assumptions", "acceptance", "evidence", "review", "result", "scope", "request", "handoff")
+
+
+def sections_of(lines):
+    """'## Name (hint)' headings -> {name: [lines]} (names lowercased, hint dropped)."""
+    out, cur = {}, None
+    for ln in lines:
+        if ln.startswith("## "):
+            name = re.split(r"[\s(]", ln[3:].strip().lower(), maxsplit=1)[0]
+            cur = name if name in SECTION_ALIASES else None
+            if cur:
+                out.setdefault(cur, [])
+        elif cur is not None:
+            out[cur].append(ln)
+    return out
+
+
+def filled(section):
+    return any(ln.strip() and not ln.lstrip().startswith("#") for ln in (section or []))
+
+
+def lint_task(path):
+    """Findings for one task file against the protocol: list of (level, code, text)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return []
+    r = parse_task(path, "")
+    if not r:
+        return []
+    sec = sections_of(lines)
+    head = "\n".join(lines[:30])
+    status = r["status"]
+    raw_status = ""
+    for ln in lines[:30]:
+        for part in ln.split("|"):
+            if ":" in part and part.split(":", 1)[0].strip().lower() in KEYS["status"]:
+                raw_status = part.split(":", 1)[1].strip().lower()
+                break
+        if raw_status:
+            break
+    out = []
+    started_or_later = raw_status.startswith(("in-progress", "in progress", "review", "rework", "done", "виконано", "готово"))
+    reviewed_state = raw_status.startswith(("review", "done", "виконано", "готово"))
+    is_done = status == "done"
+    acc = sec.get("acceptance", [])
+    acc_boxes = [ln for ln in acc if re.match(r"^\s*[-*] \[( |x|X)\]", ln)]
+    acc_open = [ln for ln in acc_boxes if re.match(r"^\s*[-*] \[ \]", ln)]
+    if not r["estimate"] and not is_done:
+        out.append(("E", "no-estimate", "no Estimate (hours)"))
+    if r["type"] == "other" and not re.search(r"^\s*(type|тип)\s*:", "\n".join(lines[:30]), re.I | re.M):
+        out.append(("W", "no-type", "no Type (object, page, process, ...), so history cannot learn from it"))
+    if not r["wave"]:
+        out.append(("W", "no-wave", "no Wave"))
+    if not acc_boxes:
+        out.append(("E", "no-acceptance", "Acceptance has no checkable '- [ ]' lines"))
+    if reviewed_state and acc_open:
+        out.append(("E", "unticked", f"{len(acc_open)} acceptance box(es) not ticked but the task is {raw_status.split(' ')[0]}"))
+    if raw_status.startswith("review") and not filled(sec.get("evidence")):
+        out.append(("E", "no-evidence", "in review with an empty Evidence section"))
+    if is_done and not r["verified"]:
+        out.append(("E", "unverified", "done without a 'Verified by' line under Review"))
+    if is_done and r["verified"]:
+        who = ""
+        for ln in sec.get("review", []):
+            m = re.search(r"verified by\s*:?\s*([^\s,.;]+)", ln, re.I)
+            if m:
+                who = m.group(1).lower()
+        first = re.sub(r"[^a-z]+", " ", r["performer"].lower()).split()
+        if who and first and who == first[0]:
+            out.append(("E", "self-verified", f"verified by its own performer ({who})"))
+    if r["risk"] == "high" and started_or_later and not re.search(r"plan approved\s*:", "\n".join(lines), re.I):
+        out.append(("E", "no-plan-approval", "Risk: high but no 'Plan approved:' line"))
+    if r["risk"] == "high" and started_or_later and not filled(sec.get("plan")):
+        out.append(("E", "no-plan", "Risk: high but an empty Plan section"))
+    if started_or_later and not filled(sec.get("understanding")):
+        out.append(("W", "no-understanding", "no Understanding section (read-back) written"))
+    if started_or_later and not re.search(r"(started|початок)\s*:\s*\d{4}", head, re.I):
+        out.append(("W", "no-started", "no Started time"))
+    if reviewed_state and not re.search(r"(finished|завершено)\s*:\s*\d{4}", head, re.I):
+        out.append(("W", "no-finished", "no Finished time"))
+    if raw_status.startswith("blocked-approval") and not re.search(r"(blocker|блокер)\s*:\s*[^\s|-]", head, re.I):
+        out.append(("W", "no-blocker", "blocked-approval without a 'Blocker:' line"))
+    if r["reworks"] >= 2 and not is_done:
+        out.append(("W", "rework-twice", f"sent back {r['reworks']} times: take it over or re-slice it"))
+    return out
+
+
+def lint(args):
+    project = opt(args, "--project")
+    if not project:
+        print("lint needs --project DIR")
+        sys.exit(2)
+    state = ""
+    try:
+        with open(os.path.join(project, "_orchestration", "STATE.md"), encoding="utf-8") as f:
+            state = f.read()
+    except Exception:
+        pass
+    strict = "--strict" in args or bool(re.search(r"^\s*protocol\s*:\s*2\b", state, re.I | re.M))
+    errors = warnings = 0
+    files = sorted(glob.glob(os.path.join(project, "_orchestration", "tasks", "*.md")))
+    for tp in files:
+        tid = os.path.splitext(os.path.basename(tp))[0]
+        for level, code, text in lint_task(tp):
+            if level == "E" and not strict:
+                level = "W"
+            errors += level == "E"
+            warnings += level == "W"
+            print(f"{'ERROR' if level == 'E' else 'warn '} {tid} [{code}] {text}")
+    mode = "protocol 2 (strict)" if strict else "legacy project (findings are warnings; put 'Protocol: 2' in STATE.md to enforce)"
+    print(f"{len(files)} task file(s), {errors} error(s), {warnings} warning(s); {mode}")
+    sys.exit(1 if errors else 0)
+
+
 def main():
     args = sys.argv[1:]
     cmd = args[0] if args else ""
-    fn = {"harvest": harvest, "predict": predict, "calibrate": calibrate}.get(cmd)
+    fn = {"harvest": harvest, "predict": predict, "calibrate": calibrate, "lint": lint}.get(cmd)
     if not fn:
         sys.stdout.write(__doc__)
         sys.exit(2)
