@@ -20,7 +20,7 @@ const SNAP_STATUS: Record<string, string[]> = {
   done: ['done', 'виконано', 'готово'],
   working: ['in-progress', 'in progress', 'working', 'doing', 'rework', 'в роботі', 'виконується'],
   paused: ['paused', 'blocked', 'пауза', 'заблок'],
-  review: ['review', 'на перевірці'],
+  review: ['review', 'plan-review', 'на перевірці'],
   queued: ['pending', 'queued', 'todo', 'new', 'prep-done', 'в черзі', 'очікує'],
 }
 const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => SNAP_STATUS[k]?.some(w => raw.startsWith(w))) ?? (raw ? 'queued' : 'unknown')
@@ -229,7 +229,7 @@ const makeTools = ($: any) => {
   // checkboxes in the body (steps and acceptance) are counted as the task's own progress.
   const ACTIVE = ['in-progress', 'in progress', 'working', 'doing', 'rework', 'в роботі', 'виконується']
   const DONE = ['done', 'виконано', 'готово']
-  const REVIEW = ['review', 'на перевірці']
+  const REVIEW = ['review', 'plan-review', 'на перевірці']
   const BLOCKED = ['blocked', 'paused', 'пауза', 'заблок']
   const NL = String.fromCharCode(10)
   const stamp = (s: string): number | undefined => {

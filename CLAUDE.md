@@ -24,13 +24,22 @@ Plugin name is `demo-team-roster` (the mod's state key must equal the plugin nam
 - `hooks/register.tsx`: the mod. `makeTools($)` builds readers (roster, session metadata, `list_sessions`, task files, snapshot). It is a top-level factory because tool hooks run outside `session.start` and cannot see its closure.
 - `hooks/register.test.tsx`, `hooks/linked.test.tsx`, `hooks/snapshot.test.tsx`: tests for the pane (roster file and linked chats; they read the card markup from the `Svg` element's `props.source` and `props.alt`) and the snapshot tool.
 - `tools/dashboard.src.html` + `tools/build-dashboard.mjs` build `skills/team-board/assets/dashboard.html` (inlines the sprite code from `hooks/sprites.ts`). Run `node tools/build-dashboard.mjs` from the repo root after editing either.
+- `skills/new-demo-team/scripts/kb.py` (+ `test_kb.py`, run `python -I skills/new-demo-team/scripts/test_kb.py`): the knowledge base of the teams. `harvest` reads every project's task files (read-only) into `~/.claude/demo-team-roster/knowledge/tasks.jsonl`, `predict --type T --guess H` corrects an estimate from history, `calibrate` prints real against estimated hours, first-pass rate and rework causes by type.
 - `skills/team-board/scripts/collect.py`: collects roster, state and tasks for the dashboard. Args: `--project DIR`, `--running id1,id2|none` (ids from `list_sessions`), `--outdir DIR`.
+
+## The improvement loop (the maintainer's side)
+
+The user cares first about quality, then about the orchestrator and helpers working well together, and only then about speed and the visuals (the widget and dashboard are for the user's own view). The system learns from every project; this chat is where it is turned into a better protocol:
+- At the start of work here, read `~/.claude/demo-team-roster/knowledge/LESSONS.md` and the `_orchestration/LESSONS.md` of recent projects (read only), and run `kb.py harvest` then `kb.py calibrate` to see the data.
+- Fold what is proven (a lesson repeated, or a rework cause that keeps coming back) into `protocol.md`, `templates.md` or the skills, add a test or a rule where one fits, and ship a new version. Note why in the commit.
+- When the user says something went wrong in a project, record it as a lesson here too: the rule, not the story.
+- Do not edit a running project's `PROTOCOL.md`; new projects start from the new one.
 
 ## Release loop
 
 1. Edit. Keep line endings as they are; Git on this machine converts LF/CRLF.
 2. `claude plugin validate .` (warnings are expected, `✘` is not). Read its result before the bump: a chain that pipes it through `tail` goes on after a failure (0.3.5 was pushed with a broken types contract that way).
-3. Run tests from a copy outside the repo, because the harness writes next to the test files: copy `hooks`, `types`, `.claude-plugin` to a temp folder and run `claude plugin test <folder>`. Tests mount the pane on several widths and validate the tree the way the engine does.
+3. Run `python -I skills/new-demo-team/scripts/test_kb.py` when `kb.py` changed, and the mod tests from a copy outside the repo, because the harness writes next to the test files: copy `hooks`, `types`, `.claude-plugin` to a temp folder and run `claude plugin test <folder>`. Tests mount the pane on several widths and validate the tree the way the engine does.
 4. Bump `version` in `.claude-plugin/plugin.json`, commit, `git push origin HEAD`.
 5. `claude plugin marketplace update demo-team-skills` then `claude plugin update demo-team-roster@demo-team-skills`. The user restarts the app to apply. Never restart for them.
 6. Dashboard: `node tools/build-dashboard.mjs`, then publish `skills/team-board/assets/dashboard.html` with the Artifact tool to the URL above and `capabilities {"db": {}, "mcp": {"servers": [{"server": "host:demo-team-roster", "tools": ["team_snapshot"]}]}}`. Data docs are written with `ArtifactData` (pin writes with `if_version`).

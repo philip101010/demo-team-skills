@@ -10,6 +10,10 @@ Claude Code tools for running Creatio demo builds with a team of parallel chats.
 | Project card | Above the members: the stage, tasks verified of all, in review, blocked, approvals waiting for you, and the time left (from the tasks' estimates by wave, corrected by how long finished tasks really took). Read from the project's `_orchestration` files. |
 | Dashboard | One page for all your projects at once, styled after the Quest Board, with the same cards as the Team tab (the orchestrator's in amber). Stop or resume watching a project with one button. |
 
+## How the teams get better
+
+Every finished task records its type, estimate, real time, and whether a reviewer sent it back and why. `kb.py` (in the `new-demo-team` skill) gathers these from all projects into `~/.claude/demo-team-roster/knowledge/`, gives a corrected estimate for the next task of the same type, and shows where the work goes wrong. At the end of each wave the orchestrator holds a short retro and writes lessons; the proven ones are folded into the protocol, so each new project starts from a better one. Quality comes before speed: every task is reviewed by someone other than its author, risky tasks need an approved plan first, and the final result is verified against the scenario.
+
 ## Install
 
 ```

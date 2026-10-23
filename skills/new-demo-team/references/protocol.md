@@ -22,7 +22,7 @@ Global (exclusive) locks: `GLOBAL-compile.lock`, `GLOBAL-base-objects.lock`, `GL
 
 ## 3. Task lifecycle
 
-`todo → claimed → in-progress → review → done`
+`todo → claimed → [plan-review, for Risk: high] → in-progress → review → done`
 Side states: `blocked` (waiting for a dependency or a lock), `paused` (see section 5), `blocked-approval` (a permission is needed, see section 6), `rework` (the reviewer sent it back, see section 12).
 The performer never sets `done` itself: it sets `review`, and a reviewer sets `done` (section 12).
 
@@ -172,6 +172,8 @@ Several projects can run in the workspace at the same time, each with its own or
 ### 12.1 Stage and time left
 - Every task carries `Wave` and `Estimate` (hours of one performer's work, set by the orchestrator at the roadmap stage, for example `1.5`). The performer writes `Started:` and `Finished:` (`YYYY-MM-DD HH:MM`, local time) when it takes the task and when it sets `review`.
 - No task is estimated above about 3 hours: split it. A task of unknown size is a spike with a time box.
+- Every task also carries `Type` (`object`, `lookup`, `page`, `process`, `aiskill`, `dashboard`, `data`, `landing`, `template`, `localization`, `recon`, `verify`, `other`) and `Risk` (`low`, or `high`: it writes to the stand in a way that is hard to undo, changes the object model, or touches an entity that a passed use case uses). The type is how history is looked up (section 14); the risk decides whether a plan gate applies (section 13).
+- The orchestrator takes the estimate from history when there is some: `kb.py predict --type <type> --guess <hours>` (section 14).
 - `STATE.md` has a `Stage:` line: `intake`, `wave 0`, `roadmap approval`, `build wave N`, `integration`, `verification`, `handover` or `paused`.
 - The Team widget and the dashboard read these fields. Time left is computed from the open tasks by wave: a wave takes its longest task or its total estimate divided by the performers working in it, whichever is longer; waves run one after another; the sum is corrected by the real-to-estimated hours ratio of the finished tasks.
 - At every wave boundary the orchestrator re-estimates the open tasks from what the finished ones really took.
@@ -179,11 +181,11 @@ Several projects can run in the workspace at the same time, each with its own or
 ### 12.2 Definition of done and review
 - `Acceptance` is a checklist (`- [ ] ...`) of checkable statements, each naming the evidence that proves it: a query result, a screenshot, a process run, a file. A task without checkable acceptance is not accepted at the roadmap stage.
 - The performer sets `review` once every box is ticked and `## Evidence` has an entry for every box.
-- The reviewer is the orchestrator or a reviewer helper, never the author. It re-checks each box from the evidence and makes one independent check of its own, read-only, on the stand (a query, a screenshot, a run). Result: `done` plus `Verified by: <name> <date>`, or `rework` with the reason under `## Review`. The performer fixes and sets `review` again. After two reworks of one task the orchestrator takes it over or re-slices it.
+- The reviewer is the orchestrator or a reviewer helper, never the author. It re-checks each box from the evidence and makes one independent check of its own, read-only, on the stand (a query, a screenshot, a run). Result, written as a line under `## Review`: `- <date time> done: Verified by <name>`, or `- <date time> rework (<category>): <what was wrong>`. The category is one of `requirement` (a requirement was missed or misread), `acceptance` (the acceptance was unclear or wrong), `dependency` (a dependent entity or step), `stand` (the state of the stand), `tool` (a tool or platform failure), `brief` (the brief was unclear), `quality` (careless result), `other`. The categories are what the retro learns from (section 14). The performer fixes and sets `review` again. After two reworks of one task the orchestrator takes it over or re-slices it.
 - `done` therefore always means verified. Reports never show a task as done on the performer's word.
 
 ### 12.3 Gates
-- **Wave exit.** All tasks of the wave are `done`; compile and publish passed (orchestrator, lock `GLOBAL-compile`); a smoke check of what the wave built (every new page, process and AI skill is opened or run once); one line in the ROADMAP log. The next wave starts only after that.
+- **Wave exit.** All tasks of the wave are `done`; compile and publish passed (orchestrator, lock `GLOBAL-compile`); a smoke check of what the wave built (every new page, process and AI skill is opened or run once); the wave retro (section 14); one line in the ROADMAP log. The next wave starts only after that.
 - **Final verification before handover.** Every use case is rehearsed clean from the scenario text with `creatio-uc-readiness` (rehearse, verify from the database and screenshots, reset, repeat until it passes clean). Results go into `findings/VERIFY.md` as a table: scenario step, expected, evidence, pass or fail. Nothing is handed over with a failing row. Then the ClickPass. The user signs off on that table.
 - **Regression.** After a change to any entity that a passed use case touches, that use case is rehearsed again.
 
@@ -200,6 +202,29 @@ The user also writes tasks straight into a chat. A task that lives only in the c
 - A small ad-hoc task follows section 8 but still gets its file (a few lines are enough) and still goes through `review`.
 - A helper that receives a task directly from the user creates the file first (same template, `Performer:` itself) and tells the orchestrator.
 - Asked "where are we" or "how long", the orchestrator answers from `STATE.md` and the task files, not from memory, and says which tasks are not estimated yet.
+
+## 13. Quality and communication
+
+Quality comes before speed. When in doubt, take the slower, safer way.
+
+- **A brief is ready** when it names the goal and why it matters, the inputs (files, ids), a checkable acceptance, the touch-set, what not to do, and how and when to report. If something is missing the helper asks before it starts, in one batched message, not after.
+- **Read-back.** Before working, the helper writes `## Understanding` in the task file: the goal and the acceptance in its own words, its assumptions, its open questions (two to five lines). With open questions it messages the orchestrator and waits only for those; without any it goes on. The orchestrator answers in the task file under the question, so the record stays.
+- **Plan before build.** For `Risk: high` the helper writes `## Plan` (steps, the entities touched, what can go wrong, how it will be checked) and sets `Status: plan-review`. The orchestrator approves with a `Plan approved: <date>` line, or corrects the plan. Nothing is changed on the stand before that. `Risk: low` has no plan gate.
+- **No silent assumptions.** Every assumption goes under `## Assumptions`; the reviewer checks them. A helper stops and asks, instead of guessing, about anything that touches customer data, the stand's state or another team's entity.
+- **Report format** (helper to orchestrator, five lines): the task and its status; what changed; evidence (paths, queries); assumptions made; open questions or risks.
+- **Files are the truth.** The task file and `STATE.md` hold the state; chat messages only notify. A helper whose context was compacted or restarted re-reads its task file and `## Understanding` first. The orchestrator never relies on a helper's memory of an earlier chat.
+- **Disagreements.** If the reviewer and the helper disagree, the orchestrator decides and writes the reason under `## Review`. A failing check is never passed to save time.
+
+## 14. Learning loop
+
+The aim is that each project makes the next one better: more accurate times, fewer reworks, fewer repeated mistakes.
+
+- **What is recorded.** Every finished task already holds what is needed: Type, Risk, Estimate, Started and Finished, the rework lines with their category and the `Verified by` line. Incidents and surprises go into the project's `_orchestration/LESSONS.md`.
+- **The knowledge base** is `~/.claude/demo-team-roster/knowledge/`: `tasks.jsonl` (one line per finished or reworked task of every project, built by `kb.py harvest`, which only reads the task files) and `LESSONS.md` (lessons that apply to every project, curated).
+- **Estimating.** Before writing an estimate run `python -I "<skill dir>/scripts/kb.py" predict --type <type> --guess <hours>`. With three or more finished tasks of that type (with estimate and real hours) it gives the typical real time and a corrected estimate; use it. Without history, use your own guess. `kb.py calibrate` shows the whole table: real against estimated hours, first-pass acceptance and rework causes by type.
+- **Wave retro** (the orchestrator, before the next wave starts; it is part of the wave exit gate): run `kb.py harvest` and `kb.py calibrate`; look at the tasks that were sent back and at the estimates that missed by more than half; for each find the category and the cause; write at most five lessons into the project's `LESSONS.md` as `- <date> [<category>] what happened -> the rule`, and mark `promote: yes` on those that hold for every project; fix the estimates of the coming waves; tell the user the three changes that would help most.
+- **Promotion** is the user's decision. With the user's yes the orchestrator copies the `promote: yes` lessons into the knowledge base `LESSONS.md`. Whoever maintains the plugin reads that file and the data, folds what is proven into this protocol and the templates, and ships a new plugin version. New projects start from the improved protocol. A lesson never changes `PROTOCOL.md` inside a running project.
+- **Final retro** at handover: the same, plus the project's real against estimated total time in `STATE.md`.
 
 ---
 
@@ -225,18 +250,23 @@ Performer: -
 Priority: P1
 Wave: 2
 Estimate: 1.5
+Type: page
+Risk: low
 Started: -
 Finished: -
 Depends on: T-xx
 Touch-set: page-Foo, process-Bar
 Approvals: <list of needed permissions and their status from APPROVALS.md, or "none">
 Scope: <what to do>
+## Understanding (the helper, before working: goal and acceptance in its own words, assumptions, open questions)
+## Plan (Risk: high only; approved by a `Plan approved: <date>` line before anything is changed)
+## Assumptions
 ## Acceptance
 - [ ] <checkable statement> (evidence: <query / screenshot / run / file>)
 - [ ] ...
 ## Result
 ## Evidence
-## Review (reviewer: Verified by, or the reason for rework)
+## Review (one line per verdict: `- <date time> done: Verified by <name>` or `- <date time> rework (<category>): <what was wrong>`)
 ## Handoff (if paused)
 ```
 
