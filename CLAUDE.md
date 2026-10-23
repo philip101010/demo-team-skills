@@ -65,6 +65,15 @@ The user cares first about quality, then about the orchestrator and helpers work
 - A live progress test needs real work: a helper told to use `Start-Sleep` cannot (the environment blocks it); give it real work (reading files, one tool call per step).
 - The dashboard "Go live" path (page calls `host:demo-team-roster` through the desktop app, owner only) is published but was not seen working in a real app yet. The first press asks for consent.
 
+## Audit (2026-10-23, `ai-driven-plugin-auditor`)
+
+Run on this repo: skills, security and architecture judges plus the inspector. Taken: shorter `new-demo-team` description (no workflow in it), one canonical copy of the roadmap and task templates (in `protocol.md`; `templates.md` points there), a contents line in `protocol.md`, a per-project copy of `kb.py` so helpers can run it, `workspaces` read from `config.json` by `collect.py` and `kb.py`, author and keywords in the manifests, README purpose lines, `CHANGELOG.md`. Not taken, on purpose: the auditor's rules for the company's `ai-driven-*` apps (name `ai-driven-<slug>`, GitLab CI, evals) do not fit a plugin whose name must equal the mod's state key and whose repo is on GitHub; `hooks/hooks.json` holds a mod's `modules`, not classic hooks, so HK-02, HK-12 and HK-13 are false positives; both skills keep auto-triggering by phrase (`new-demo-team` has a plan-confirmation gate); backslash paths stay in the prose because the work is on Windows. Security judge: no real findings. Known coupling: task-file parsing exists twice, in `loadTasks` (`register.tsx`) and in `kb.py`; change both together and keep the sample headers in `register.test.tsx` and `test_kb.py` alike.
+
+## Verified live and not yet
+
+- 2026-10-22, seen working in the real app by the user: the Team pane (cards, working and idle states, progress and ETA from `roster_step` and from task files, fixed order, the orchestrator and its helpers).
+- Not yet seen live: "Go live" on the dashboard; the project card (stage, time left) and the live files with a real project on protocol 2; `kb.py lint` and `predict` in a real wave.
+
 ## Open items
 
 - Verify "Go live" in the desktop app; read the reason in the header if it falls back to the snapshot.

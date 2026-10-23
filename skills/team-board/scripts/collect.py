@@ -20,6 +20,9 @@ def load(p):
         return None
 
 
+# The workspaces folder may be set in ~/.claude/demo-team-roster/config.json ({"workspaces": "..."}).
+WORK = (load(os.path.join(PROG, "config.json")) or {}).get("workspaces") or WORK
+
 meta_by_id = {}
 for p in META:
     m = load(p)

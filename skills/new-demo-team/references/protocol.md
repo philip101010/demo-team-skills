@@ -2,6 +2,8 @@
 
 Applies to the orchestrator and all parallel chats. One stand, many performers: work is divided by **entities** so tasks do not overlap in time.
 
+Contents: 1 Structure · 2 Roles · 3 Task lifecycle · 4 Rules on a shared stand · 5 Pause on limits · 6 Preflight: permissions and approvals · 7 Demo start · 8 Small task in an existing demo · 9 Conflicts · 10 Report and priorities · 11 Project and team isolation · 12 Where we are, quality gates, verification · 13 Quality and communication · 14 Learning loop · Templates (ROADMAP, task file, lock).
+
 ## 1. Structure in the demo folder
 
 ```
@@ -185,7 +187,7 @@ Several projects can run in the workspace at the same time, each with its own or
 - `done` therefore always means verified. Reports never show a task as done on the performer's word.
 
 ### 12.3 Gates
-- **Process check.** At every checkpoint and before a wave closes the orchestrator runs `python -I "<skill dir>/scripts/kb.py" lint --project <folder>`. It finds, mechanically, what the protocol forbids: a task `done` without a `Verified by` line, verified by its own performer, done or in review with acceptance boxes unticked, in review with no evidence, `Risk: high` without a written and approved plan, a task with no estimate or no checkable acceptance. In a project whose `STATE.md` has `Protocol: 2` these are errors and the exit code is 1; a wave does not close with errors. In an older project they are warnings.
+- **Process check.** At every checkpoint and before a wave closes the orchestrator runs `python -I _orchestration/kb.py lint --project <folder>`. It finds, mechanically, what the protocol forbids: a task `done` without a `Verified by` line, verified by its own performer, done or in review with acceptance boxes unticked, in review with no evidence, `Risk: high` without a written and approved plan, a task with no estimate or no checkable acceptance. In a project whose `STATE.md` has `Protocol: 2` these are errors and the exit code is 1; a wave does not close with errors. In an older project they are warnings.
 - **Wave exit.** All tasks of the wave are `done`; compile and publish passed (orchestrator, lock `GLOBAL-compile`); a smoke check of what the wave built (every new page, process and AI skill is opened or run once); the wave retro (section 14); one line in the ROADMAP log. The next wave starts only after that.
 - **Final verification before handover.** Every use case is rehearsed clean from the scenario text with `creatio-uc-readiness` (rehearse, verify from the database and screenshots, reset, repeat until it passes clean). Results go into `findings/VERIFY.md` as a table: scenario step, expected, evidence, pass or fail. Nothing is handed over with a failing row. Then the ClickPass. The user signs off on that table.
 - **Regression.** After a change to any entity that a passed use case touches, that use case is rehearsed again.
@@ -221,8 +223,9 @@ Quality comes before speed. When in doubt, take the slower, safer way.
 The aim is that each project makes the next one better: more accurate times, fewer reworks, fewer repeated mistakes.
 
 - **What is recorded.** Every finished task already holds what is needed: Type, Risk, Estimate, Started and Finished, the rework lines with their category and the `Verified by` line. Incidents and surprises go into the project's `_orchestration/LESSONS.md`.
+- **The tool** is `_orchestration/kb.py`, a copy of the plugin's script placed there at project start, so everyone in the project can run it (from the project folder: `python -I _orchestration/kb.py <command> ...`).
 - **The knowledge base** is `~/.claude/demo-team-roster/knowledge/`: `tasks.jsonl` (one line per finished or reworked task of every project, built by `kb.py harvest`, which only reads the task files) and `LESSONS.md` (lessons that apply to every project, curated).
-- **Estimating.** Before writing an estimate run `python -I "<skill dir>/scripts/kb.py" predict --type <type> --guess <hours>`. With three or more finished tasks of that type (with estimate and real hours) it gives the typical real time and a corrected estimate; use it. Without history, use your own guess. `kb.py calibrate` shows the whole table: real against estimated hours, first-pass acceptance and rework causes by type.
+- **Estimating.** Before writing an estimate run `python -I _orchestration/kb.py predict --type <type> --guess <hours>`. With three or more finished tasks of that type (with estimate and real hours) it gives the typical real time and a corrected estimate; use it. Without history, use your own guess. `kb.py calibrate` shows the whole table: real against estimated hours, first-pass acceptance and rework causes by type.
 - **Wave retro** (the orchestrator, before the next wave starts; it is part of the wave exit gate): run `kb.py harvest` and `kb.py calibrate`; look at the tasks that were sent back and at the estimates that missed by more than half; for each find the category and the cause; write at most five lessons into the project's `LESSONS.md` as `- <date> [<category>] what happened -> the rule`, and mark `promote: yes` on those that hold for every project; fix the estimates of the coming waves; tell the user the three changes that would help most.
 - **Promotion** is the user's decision. With the user's yes the orchestrator copies the `promote: yes` lessons into the knowledge base `LESSONS.md`. Whoever maintains the plugin reads that file and the data, folds what is proven into this protocol and the templates, and ships a new plugin version. New projects start from the improved protocol. A lesson never changes `PROTOCOL.md` inside a running project.
 - **Final retro** at handover: the same, plus the project's real against estimated total time in `STATE.md`.
@@ -234,32 +237,31 @@ The aim is that each project makes the next one better: more accurate times, few
 ### ROADMAP.md
 ```
 # Roadmap: <demo> (instance: <env>)
-## Waves
+PROJECT block
+Status: DRAFT / ON APPROVAL / APPROVED
+## Waves (tasks with wave, estimate in hours, dependencies and performer)
 ### Wave 1: foundation
-- T-01 ...  (depends: -)
+- T-01 ...  (estimate: 1.5 h; depends: -; performer: ...)
 ### Wave 2: parallel
-- T-02 ...  (depends: T-01)
-## Log
-- <date> <who> <event>
+- T-02 ...  (estimate: 2 h; depends: T-01; performer: ...)
+## Wave exit gates (what is smoke-checked at the end of each wave)
+## Critical path
+## Final verification (use cases to rehearse clean, findings/VERIFY.md)
+## Risks
+## Log (events and `Checkpoint:` lines with the time)
+- <date time> <who> <event>
 ```
 
 ### tasks/T-NN.md
 ```
 # T-NN: <title>
-Status: todo
-Performer: -
-Priority: P1
-Wave: 2
-Estimate: 1.5
-Type: page
-Risk: low
-Started: -
-Finished: -
-Depends on: T-xx
-Touch-set: page-Foo, process-Bar
-Approvals: <list of needed permissions and their status from APPROVALS.md, or "none">
-Scope: <what to do>
-## Understanding (the helper, before working: goal and acceptance in its own words, assumptions, open questions)
+PROJECT block (short)
+Status: todo | Performer: <name> | Priority: P1
+Wave: <N> | Estimate: <hours, at most about 3> | Type: <object | lookup | page | process | aiskill | dashboard | data | landing | template | localization | recon | verify | other> | Risk: <low | high> | Started: - | Finished: -
+Depends on: <T-xx> | Touch-set: <entities, e.g. page-Foo, process-Bar> | Approvals: <needed permissions and their status from APPROVALS.md, or "none"> | Blocker: -
+## Request (only when the user gave it in the chat: their own words, verbatim)
+## Scope
+## Understanding (the helper, before working: goal and acceptance in its own words, assumptions, open questions; the orchestrator answers under each question)
 ## Plan (Risk: high only; approved by a `Plan approved: <date>` line before anything is changed)
 ## Assumptions
 ## Acceptance
@@ -267,9 +269,10 @@ Scope: <what to do>
 - [ ] ...
 ## Result
 ## Evidence
-## Review (one line per verdict: `- <date time> done: Verified by <name>` or `- <date time> rework (<category>): <what was wrong>`)
+## Review (one line per verdict: `- <date time> done: Verified by <name>` or `- <date time> rework (<category>): <what was wrong>`; categories: requirement, acceptance, dependency, stand, tool, brief, quality, other)
 ## Handoff (if paused)
 ```
+Header lines are `Key: value`, or several `A: x | B: y` on one line. The Team widget reads Status, Performer, Priority, Wave, Estimate, Started, Finished, Depends on and Blocker; `kb.py` also reads Type, Risk and the Review lines.
 
 ### locks/<type>-<name>.lock
 ```

@@ -41,6 +41,15 @@ def default_kb():
     return os.path.join(os.path.expanduser("~"), ".claude", "demo-team-roster", "knowledge")
 
 
+def workspaces_root():
+    """The workspaces folder: config.json {"workspaces": ...} beside the knowledge base, else the default."""
+    try:
+        with open(os.path.join(os.path.expanduser("~"), ".claude", "demo-team-roster", "config.json"), encoding="utf-8") as f:
+            return json.load(f).get("workspaces") or r"C:\Projects\Workspaces"
+    except Exception:
+        return r"C:\Projects\Workspaces"
+
+
 def stamp(text):
     m = STAMP.search(text or "")
     if not m:
@@ -132,7 +141,7 @@ def write_kb(kb, records):
 
 def harvest(args):
     kb = opt(args, "--kb") or default_kb()
-    root = opt(args, "--root") or r"C:\Projects\Workspaces"
+    root = opt(args, "--root") or workspaces_root()
     project = opt(args, "--project")
     dirs = [project] if project else sorted(p for p in glob.glob(os.path.join(root, "*")) if os.path.isdir(p))
     records = read_kb(kb)

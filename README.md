@@ -1,6 +1,10 @@
 # demo-team-skills
 
-Claude Code tools for running Creatio demo builds with a team of parallel chats. One plugin, `demo-team-roster`, carries everything:
+Claude Code tools for running Creatio demo builds with a team of parallel chats.
+
+Who it is for: a demo engineer who runs several Claude chats at once on one build. The trouble it addresses: parallel chats step on each other, report "done" without proof, and nobody can tell where the project stands or how long is left. How success is judged: every task is verified by someone other than its author, the stage and the time left are readable at a glance, and estimates get more accurate from project to project.
+
+One plugin, `demo-team-roster`, carries everything:
 
 | Part | What it does |
 |---|---|

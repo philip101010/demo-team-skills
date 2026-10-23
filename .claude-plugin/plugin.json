@@ -1,7 +1,9 @@
 {
   "name": "demo-team-roster",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Run Creatio demo builds with a team of parallel chats: the new-demo-team and team-board skills, plus a Team widget with pixel knights that shows who is working, on what, with progress and ETA.",
+  "author": { "name": "philip101010", "url": "https://github.com/philip101010" },
   "license": "MIT",
+  "keywords": ["creatio", "demo", "orchestration", "parallel-agents", "team"],
   "types": "./types/index.d.ts"
 }

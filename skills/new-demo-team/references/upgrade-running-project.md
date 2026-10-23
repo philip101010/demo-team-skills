@@ -6,7 +6,8 @@ For the orchestrator of a project that started before sections 12 to 14 of the p
 
 1. Copy sections 12, 13 and 14 and the new task template from the plugin's `references/protocol.md` into the project's `_orchestration/PROTOCOL.md`. Add the new statuses to section 3 (`review`, `rework`, `plan-review`). This is the user's decision, as `PROTOCOL.md` says.
 2. Tell every helper, in one message: from now on a finished task goes to `review` (never `done`), every task starts with a short `## Understanding`, a `Risk: high` task gets a `## Plan` and waits for `Plan approved`, assumptions go under `## Assumptions`, reports have five lines. Point them to `PROTOCOL.md` sections 12 and 13.
-3. Start a reviewer: a helper that is not the author of the tasks it checks (a cheaper model is fine), with the reviewer prompt from the plugin's `references/templates.md`.
+3. Copy the plugin's `scripts/kb.py` to `_orchestration/kb.py` (the tool the protocol refers to: `lint`, `predict`, `harvest`, `calibrate`).
+4. Start a reviewer: a helper that is not the author of the tasks it checks (a cheaper model is fine), with the reviewer prompt from the plugin's `references/templates.md`.
 
 ## 2. Bring the open tasks up to date
 

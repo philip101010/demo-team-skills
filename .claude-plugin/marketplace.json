@@ -1,6 +1,6 @@
 {
   "name": "demo-team-skills",
-  "owner": { "name": "philip101010" },
+  "owner": { "name": "philip101010", "url": "https://github.com/philip101010" },
   "plugins": [
     {
       "name": "demo-team-roster",

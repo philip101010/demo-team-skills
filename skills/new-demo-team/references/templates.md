@@ -48,18 +48,8 @@ Blockers: ...
 Needs the user: <pending approvals and decisions, each with the date asked; or "nothing">
 ```
 
-## ROADMAP.md
-```
-# Roadmap: <NAME>
-PROJECT block
-Status: DRAFT / ON APPROVAL / APPROVED
-## Waves (tasks with wave, estimate in hours, dependencies and performer)
-## Wave exit gates (what is smoke-checked at the end of each wave)
-## Critical path
-## Final verification (use cases to rehearse clean, findings\VERIFY.md)
-## Risks
-## Log (events and `Checkpoint:` lines with the time)
-```
+## ROADMAP.md, tasks/T-NN.md, locks
+The canonical templates are in `PROTOCOL.md` (section "Templates"), so a helper in the project sees the same text. Write the project's files from there; do not keep a second copy of them here.
 
 ## APPROVALS.md
 ```
@@ -68,24 +58,3 @@ Statuses: pending / granted / denied
 | # | Action | Tasks | Risk | Status |
 ## User decisions (question | recommendation)
 ```
-
-## Task file tasks\T-NN.md
-```
-# T-NN: <title>
-PROJECT block (short)
-Status: todo | Performer: <name> | Priority: P1
-Wave: <N> | Estimate: <hours, at most about 3> | Type: <object | lookup | page | process | aiskill | dashboard | data | landing | template | localization | recon | verify | other> | Risk: <low | high> | Started: - | Finished: -
-Depends on: <T-xx> | Touch-set: <entities> | Approvals: <list or none> | Blocker: -
-## Request (only when the user gave it in the chat: their own words, verbatim)
-## Scope
-## Understanding (the helper, before working: goal and acceptance in its own words, assumptions, open questions; the orchestrator answers under each question)
-## Plan (Risk: high only; approved by a `Plan approved: <date>` line before anything is changed)
-## Assumptions
-## Acceptance
-- [ ] <checkable statement> (evidence: <query / screenshot / run / file>)
-## Result
-## Evidence
-## Review (one line per verdict: `- <date time> done: Verified by <name>` or `- <date time> rework (<category>): <what was wrong>`; categories: requirement, acceptance, dependency, stand, tool, brief, quality, other)
-## Handoff (if paused)
-```
-Header lines are `Key: value`, or several `A: x | B: y` on one line. The Team widget reads Status, Performer, Priority, Wave, Estimate, Started, Finished, Depends on and Blocker; the knowledge base script (`scripts/kb.py`) also reads Type, Risk and the Review lines.
