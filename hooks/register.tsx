@@ -372,6 +372,7 @@ const makeTools = ($: any) => {
             total: total ?? null,
             elapsedMs: elapsed ?? null,
             etaMs: eta ?? null,
+            tasksDone: tf.total > 0 ? tf.done : null,
           })
         }
         projects.push({
@@ -481,6 +482,7 @@ export const register: Register = on => {
             total: hasSteps ? total : undefined,
             elapsedMs: elapsed,
             etaMs: eta,
+            tasksDone: tf.total > 0 ? tf.done : undefined,
           })
         }
         await update($, members, () => out)
@@ -508,6 +510,7 @@ export const register: Register = on => {
               total: m.total ?? null,
               elapsedMs: m.elapsedMs ?? null,
               etaMs: m.etaMs ?? null,
+              tasksDone: m.tasksDone ?? null,
             })),
           )
         }
@@ -633,7 +636,7 @@ export const register: Register = on => {
             {row.map(m => (
               <Box width={width}>
                 {Svg ? (
-                  <Svg source={cardSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}. ${pctOf(m)} ${m.task ?? ''} ${stepOf(m)}`.trim()} />
+                  <Svg source={cardSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}. ${pctOf(m)} ${m.task ?? ''} ${stepOf(m)} ${typeof m.tasksDone === 'number' ? `${m.tasksDone} tasks done.` : ''}`.trim()} />
                 ) : (
                   <Text wrap="truncate-end">
                     {m.state === 'working' ? '>' : 'z'} {m.name} {pctOf(m) || EMPTY} {m.task ?? EMPTY}

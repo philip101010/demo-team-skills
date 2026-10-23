@@ -47,6 +47,8 @@ test('the pane draws the team', async ($, on) => {
   const cards = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.source))
   expect(cards.some(s => s.includes('>Gareth<'))).toBe(true)
   expect(cards.some(s => s.includes('>—<'))).toBe(true)
+  // The number of its finished tasks stands by the name (Gareth has one task, not done).
+  expect(cards.some(s => /Gareth<tspan[^>]*>0</.test(s))).toBe(true)
   const alts = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.alt))
   expect(alts.some(a => a.startsWith('Gareth') && a.includes('working'))).toBe(true)
   expect(alts.some(a => a.startsWith('Lamorak') && a.includes('idling'))).toBe(true)

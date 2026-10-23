@@ -285,7 +285,7 @@ export const cardSvg = (m: Member, isRetro = false): string => {
 <rect class="cb${isLead ? ' lead' : ''}" x="${isRetro ? 1 : 0.5}" y="${isRetro ? 1 : 0.5}" width="${CARD_W - (isRetro ? 2 : 1)}" height="${CARD_H - (isRetro ? 2 : 1)}" rx="${isRetro ? 0 : 12}"/>
 <svg x="12" y="16" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
 <rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}" opacity="${live ? 1 : 0.55}"/>${fill}
-${text(isLead ? 'ld hl' : 't hl', x0, 22, fit(m.name, 18))}${text('s', x1, 22, pctOf(m) || DASH, 'end')}
+<text class="${isLead ? 'ld' : 't'} hl" x="${x0}" y="22" font-size="12">${esc(fit(m.name, 18))}${typeof m.tasksDone === 'number' ? `<tspan class="m" dx="6" font-weight="400">${m.tasksDone}</tspan>` : ''}</text>${text('s', x1, 22, pctOf(m) || DASH, 'end')}
 ${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
 ${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
 ${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}

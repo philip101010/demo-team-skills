@@ -13,6 +13,8 @@ export type Member = {
   total?: number
   elapsedMs?: number
   etaMs?: number
+  /** Tasks of its own that are done (from the task files); absent when it has none. */
+  tasksDone?: number
   /** Only the dashboard knows it: the orchestrator card is drawn in the accent colour. */
   role?: string
 }

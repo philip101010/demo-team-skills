@@ -124,9 +124,14 @@ for rp in sorted(glob.glob(os.path.join(WORK, "*", "_orchestration", "roster.jso
     if r.get("orchestrator"):
         ms.append(member(r["orchestrator"], "orchestrator", pdir))
     ms += [member(e, "helper", pdir) for e in r.get("members", [])]
+    tasks = tasks_of(pdir)
+    for x in ms:  # tasks of its own that are done, matched by the first word of the name
+        first = (re.sub(r"[^a-z]+", " ", x["name"].lower()).split() or [""])[0]
+        mine = [t for t in tasks if first and first in t["performer"].lower()]
+        x["tasksDone"] = sum(1 for t in mine if t["status"] == "done") if mine else None
     projects.append({
         "slug": re.sub(r"[^a-z0-9]+", "-", os.path.basename(pdir).lower()).strip("-"),
-        "name": os.path.basename(pdir), "members": ms, "tasks": tasks_of(pdir),
+        "name": os.path.basename(pdir), "members": ms, "tasks": tasks,
         "working": sum(1 for x in ms if x["state"] == "working"),
     })
 
