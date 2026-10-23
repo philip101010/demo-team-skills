@@ -14,6 +14,15 @@ const ROSTER = JSON.stringify({
 
 const TASK = `# T-11: Track A
 Priority: P0 | Status: todo | Performer: Gareth | Depends on: -
+Wave: 1 | Estimate: 2
+`
+
+// A blocked task with a blocker line and two checkboxes, one ticked.
+const TASK2 = `# T-12: Track B
+Status: blocked-approval | Performer: Lamorak | Priority: P1
+Blocker: need the compile approval
+- [x] step one
+- [ ] step two
 `
 
 test('the pane draws the team', async ($, on) => {
@@ -28,8 +37,8 @@ test('the pane draws the team', async ($, on) => {
   on('clock.every', () => ({ value: undefined }))
   on('store.get', () => ({ value: undefined }))
   on('store.set', () => ({ value: undefined }))
-  on('fs.read', (_, e: any) => ({ value: String(e.path).endsWith('roster.json') ? ROSTER : String(e.path).endsWith('T-11.md') ? TASK : '{}' }))
-  on('fs.list', () => ({ value: [{ kind: 'file', name: 'T-11.md', mtimeMs: 1 }] as never }))
+  on('fs.read', (_, e: any) => ({ value: String(e.path).endsWith('roster.json') ? ROSTER : String(e.path).endsWith('T-11.md') ? TASK : String(e.path).endsWith('T-12.md') ? TASK2 : String(e.path).endsWith('STATE.md') ? 'Stage: build wave 1' + String.fromCharCode(10) : '{}' }))
+  on('fs.list', () => ({ value: [{ kind: 'file', name: 'T-11.md', mtimeMs: 1 }, { kind: 'file', name: 'T-12.md', mtimeMs: 1 }] as never }))
   on('fs.exists', () => ({ value: false }))
   on('fs.stat', () => ({ value: { mtimeMs: 0 } }))
   const written: Record<string, string> = {}
@@ -49,9 +58,14 @@ test('the pane draws the team', async ($, on) => {
   expect(cards.some(s => s.includes('>—<'))).toBe(true)
   // The number of its finished tasks stands by the name (Gareth has one task, not done).
   expect(cards.some(s => /Gareth<tspan[^>]*>0</.test(s))).toBe(true)
+  // A blocker line in a task file shows in red on its performer's card, with the steps ticked so far as progress.
+  expect(cards.some(s => s.includes('Lamorak') && s.includes('Blocked: need the compile') && s.includes('50%'))).toBe(true)
+  // The project card: stage from STATE.md, tasks verified of all, time left from the estimates (waves run in
+  // turn: one task of 2 h in wave 1 and one unestimated task counted at the median in wave 0), blocked count.
+  expect(cards.some(s => s.includes('build wave 1') && s.includes('0 of 2 verified') && s.includes('~4 h left') && s.includes('1 blocked'))).toBe(true)
   const alts = (await ui.findAll({ type: 'Svg' })).map(c => String(c.props.alt))
   expect(alts.some(a => a.startsWith('Gareth') && a.includes('working'))).toBe(true)
-  expect(alts.some(a => a.startsWith('Lamorak') && a.includes('idling'))).toBe(true)
+  expect(alts.some(a => a.startsWith('Lamorak') && a.includes('blocked'))).toBe(true)
   // The pane publishes what it shows, so the dashboard can read it from any chat.
   const live = Object.entries(written).find(([path]) => path.includes('live-'))
   expect(live).toBeDefined()

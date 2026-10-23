@@ -19,6 +19,20 @@ export type Member = {
   role?: string
 }
 
+/** One line about a whole project: where it stands and how long is left. */
+export type ProjectSummary = {
+  stage: string
+  total: number
+  done: number
+  review: number
+  blocked: number
+  working: number
+  /** Pending approvals waiting for the user. */
+  needsUser: number
+  /** Hours left, from the open tasks' estimates; absent when no task has an estimate. */
+  hoursLeft?: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'demo-team-roster': {
@@ -27,6 +41,8 @@ declare module 'claude-code' {
       since: Record<string, number>
       /** True in the chat that watches the roster (the orchestrator), false in the listed helpers. */
       isOrchestrator: boolean
+      /** The summary of the project this chat shows, or null. */
+      summary: ProjectSummary | null
     }
   }
 }

@@ -1,8 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Member } from '../types'
-import { cardSvg, classOf, pctOf, statusOf, stepOf } from './sprites'
+import type { Member, ProjectSummary } from '../types'
+import { cardSvg, classOf, pctOf, statusOf, stepOf, summarySvg } from './sprites'
 
 const PANE = 'demo-team-roster'
 // Cells across the narrowest the pane can be, until the real one has been seen.
@@ -18,8 +18,9 @@ const GET_TOOL = 'mcp__ccd_session_mgmt__get_session'
 const EMPTY = '—'
 const SNAP_STATUS: Record<string, string[]> = {
   done: ['done', 'виконано', 'готово'],
-  working: ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується'],
+  working: ['in-progress', 'in progress', 'working', 'doing', 'rework', 'в роботі', 'виконується'],
   paused: ['paused', 'blocked', 'пауза', 'заблок'],
+  review: ['review', 'на перевірці'],
   queued: ['pending', 'queued', 'todo', 'new', 'prep-done', 'в черзі', 'очікує'],
 }
 const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => SNAP_STATUS[k]?.some(w => raw.startsWith(w))) ?? (raw ? 'queued' : 'unknown')
@@ -27,10 +28,27 @@ const statusClass = (raw: string): string => Object.keys(SNAP_STATUS).find(k => 
 const members = atom({ plugin: 'demo-team-roster', key: 'members' } as const, [] as Member[])
 const since = atom({ plugin: 'demo-team-roster', key: 'since' } as const, {} as Record<string, number>)
 const isOrch = atom({ plugin: 'demo-team-roster', key: 'isOrchestrator' } as const, false)
+const summary = atom({ plugin: 'demo-team-roster', key: 'summary' } as const, null as ProjectSummary | null)
 
 type RosterEntry = { name: string; id: string; class?: string; cwd?: string }
 type RosterFile = { orchestrator?: RosterEntry; members?: RosterEntry[] }
 type Progress = { task?: string; note?: string; done?: number; total?: number; startedAt?: number; updatedAt?: number }
+type TaskRec = {
+  mtime: number
+  id: string
+  title: string
+  status: string
+  performer: string
+  priority: string
+  depends: string
+  wave?: number
+  estimate?: number
+  started?: number
+  finished?: number
+  blocker: string
+  boxesDone: number
+  boxesTotal: number
+}
 type SessionMeta = {
   cliSessionId?: string
   cwd?: string
@@ -69,7 +87,7 @@ const makeTools = ($: any) => {
   const rosterDir = [home, '.claude', 'demo-team-roster'].join(sep)
   const projectsDir = [home, '.claude', 'projects'].join(sep)
   const metaPaths = new Map<string, string>()
-  const taskCache = new Map<string, { mtime: number; id: string; title: string; status: string; performer: string; priority: string; depends: string }>()
+  const taskCache = new Map<string, TaskRec>()
   let canList = true
   let listFailedAt = 0
 
@@ -207,38 +225,75 @@ const makeTools = ($: any) => {
     return dir
   }
 
-  // What the task files say about a helper: its current task and how many of its tasks are done.
-  // Header lines are 'Key: value', or several of them on one line separated by '|'.
-  const ACTIVE = ['in-progress', 'in progress', 'working', 'doing', 'в роботі', 'виконується']
+  // The task files: header lines are 'Key: value', or several of them on one line separated by '|'; the
+  // checkboxes in the body (steps and acceptance) are counted as the task's own progress.
+  const ACTIVE = ['in-progress', 'in progress', 'working', 'doing', 'rework', 'в роботі', 'виконується']
   const DONE = ['done', 'виконано', 'готово']
-  const tasksFor = async (cwd: string, name: string): Promise<{ current?: string; done: number; total: number }> => {
-    const res: { current?: string; done: number; total: number } = { done: 0, total: 0 }
+  const REVIEW = ['review', 'на перевірці']
+  const BLOCKED = ['blocked', 'paused', 'пауза', 'заблок']
+  const NL = String.fromCharCode(10)
+  const stamp = (s: string): number | undefined => {
+    const m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s)
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime() : undefined
+  }
+  const readText = async (path: string): Promise<string | undefined> => {
+    try {
+      const t = await $.fs.read(path)
+      return typeof t === 'string' ? t : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  const loadTasks = async (cwd: string): Promise<TaskRec[]> => {
+    const out: TaskRec[] = []
     try {
       const dir = [cwd, '_orchestration', 'tasks'].join(sep)
-      const first = name.toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')[0] ?? ''
-      if (!first) return res
       for (const f of await $.fs.list(dir)) {
         if (f.kind !== 'file' || !f.name.endsWith('.md')) continue
         const path = [dir, f.name].join(sep)
         let c = taskCache.get(path)
         if (!c || c.mtime !== f.mtimeMs) {
-          const lines = String(await $.fs.read(path)).split(String.fromCharCode(10)).slice(0, 14)
+          const all = String(await $.fs.read(path)).split(NL)
+          const lines = all.slice(0, 24)
           const title = (lines.find(l => l.startsWith('# ')) ?? '').slice(2).trim()
           let status = ''
           let performer = ''
           let priority = ''
           let depends = ''
+          let wave: number | undefined
+          let estimate: number | undefined
+          let started: number | undefined
+          let finished: number | undefined
+          let blocker = ''
           for (const line of lines) {
             for (const part of line.split('|')) {
               const i = part.indexOf(':')
               if (i < 0) continue
               const key = part.slice(0, i).trim().toLowerCase()
-              const val = part.slice(i + 1).trim().toLowerCase()
+              const raw = part.slice(i + 1).trim()
+              const val = raw.toLowerCase()
               if ((key === 'status' || key === 'статус') && !status) status = val
               if ((key === 'performer' || key === 'виконавець') && !performer) performer = val
-              if ((key === 'priority' || key === 'пріоритет') && !priority) priority = part.slice(i + 1).trim()
-              if ((key === 'depends on' || key === 'залежить від') && !depends) depends = part.slice(i + 1).trim()
+              if ((key === 'priority' || key === 'пріоритет') && !priority) priority = raw
+              if ((key === 'depends on' || key === 'залежить від') && !depends) depends = raw
+              if ((key === 'wave' || key === 'хвиля') && wave === undefined && /\d/.test(raw)) wave = parseInt(raw.replace(/\D+/g, ''), 10)
+              if ((key === 'estimate' || key === 'оцінка') && estimate === undefined) {
+                const n = parseFloat(raw.replace(',', '.'))
+                if (n > 0) estimate = n
+              }
+              if ((key === 'started' || key === 'початок') && started === undefined) started = stamp(raw)
+              if ((key === 'finished' || key === 'завершено') && finished === undefined) finished = stamp(raw)
+              if ((key === 'blocker' || key === 'блокер') && !blocker && raw !== '-') blocker = raw.slice(0, 90)
             }
+          }
+          let boxesDone = 0
+          let boxesTotal = 0
+          for (const line of all) {
+            const m = /^\s*[-*] \[( |x|X)\]/.exec(line)
+            if (!m) continue
+            boxesTotal += 1
+            if (m[1] !== ' ') boxesDone += 1
           }
           const colon = title.indexOf(':')
           c = {
@@ -249,43 +304,133 @@ const makeTools = ($: any) => {
             performer,
             priority,
             depends,
+            wave,
+            estimate,
+            started,
+            finished,
+            blocker,
+            boxesDone,
+            boxesTotal,
           }
           taskCache.set(path, c)
         }
-        if (!c.performer.includes(first)) continue
-        res.total += 1
-        if (DONE.some(w => c.status.startsWith(w))) res.done += 1
-        else if (!res.current && ACTIVE.some(w => c.status.startsWith(w))) res.current = c.title
-      }
-    } catch {
-      // no tasks folder
-    }
-    return res
-  }
-
-  const listTasks = async (dir: string) => {
-    const out: { id: string; title: string; priority: string; status: string; performer: string; depends: string }[] = []
-    try {
-      const tdir = [dir, '_orchestration', 'tasks'].join(sep)
-      await tasksFor(dir, '~') // fills the task cache for every file in the folder
-      for (const f of await $.fs.list(tdir)) {
-        if (f.kind !== 'file' || !f.name.endsWith('.md')) continue
-        const c = taskCache.get([tdir, f.name].join(sep))
-        if (!c) continue
-        const dep = c.depends.replace('(', ',').split(',')[0]?.trim() ?? ''
-        out.push({
-          id: c.id,
-          title: c.title.slice(0, 110),
-          priority: c.priority,
-          status: statusClass(c.status),
-          performer: (c.performer.split('.')[0] ?? '').slice(0, 40),
-          depends: ['-', '0', 'none', 'немає'].includes(dep) ? '' : dep.slice(0, 40),
-        })
+        out.push(c)
       }
     } catch {
       // no tasks folder
     }
     return out
+  }
+
+  // What the task files say about a helper: its current task, how many of its tasks are done, the steps of the
+  // current one (its checkboxes) and what blocks it.
+  const tasksFor = async (
+    cwd: string,
+    name: string,
+  ): Promise<{ current?: string; done: number; total: number; steps?: { done: number; total: number }; startedAt?: number; blocker?: string }> => {
+    const res: { current?: string; done: number; total: number; steps?: { done: number; total: number }; startedAt?: number; blocker?: string } = { done: 0, total: 0 }
+    const first = name.toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')[0] ?? ''
+    if (!first) return res
+    for (const c of await loadTasks(cwd)) {
+      if (!c.performer.includes(first)) continue
+      res.total += 1
+      if (DONE.some(w => c.status.startsWith(w))) res.done += 1
+      else if (!res.current && (ACTIVE.some(w => c.status.startsWith(w)) || REVIEW.some(w => c.status.startsWith(w)))) {
+        res.current = c.title
+        res.startedAt = c.started
+        if (c.boxesTotal > 0) res.steps = { done: c.boxesDone, total: c.boxesTotal }
+      }
+      if (!res.blocker && BLOCKED.some(w => c.status.startsWith(w))) {
+        // A blocked member still shows its task and how far it got.
+        if (!res.current) res.current = c.title
+        if (!res.steps && c.boxesTotal > 0) res.steps = { done: c.boxesDone, total: c.boxesTotal }
+        res.blocker = c.blocker || (c.status.startsWith('blocked-approval') ? 'approval needed' : c.status.startsWith('blocked') ? 'waiting for a dependency' : '')
+      }
+    }
+    return res
+  }
+
+  const listTasks = async (dir: string) => {
+    const out: { id: string; title: string; priority: string; status: string; performer: string; depends: string; wave: number | null; estimate: number | null }[] = []
+    for (const c of await loadTasks(dir)) {
+      const dep = c.depends.replace('(', ',').split(',')[0]?.trim() ?? ''
+      out.push({
+        id: c.id,
+        title: c.title.slice(0, 110),
+        priority: c.priority,
+        status: statusClass(c.status),
+        performer: (c.performer.split('.')[0] ?? '').slice(0, 40),
+        depends: ['-', '0', 'none', 'немає'].includes(dep) ? '' : dep.slice(0, 40),
+        wave: c.wave ?? null,
+        estimate: c.estimate ?? null,
+      })
+    }
+    return out
+  }
+
+  // Where the project stands: the stage (STATE.md), tasks verified of all, what blocks, what waits for the
+  // user (pending rows of APPROVALS.md) and the hours left. Time left runs wave after wave: a wave takes its
+  // longest task or its total divided by the performers in it, whichever is longer; the sum is corrected by
+  // how long the finished tasks really took against their estimates.
+  const projSummary = async (dir: string): Promise<ProjectSummary | null> => {
+    const tasks = await loadTasks(dir)
+    let stage = ''
+    for (const line of ((await readText([dir, '_orchestration', 'STATE.md'].join(sep))) ?? '').split(NL).slice(0, 60)) {
+      const m = /^\s*(?:stage|етап)\s*:\s*(.+)$/i.exec(line)
+      if (m) {
+        stage = (m[1] ?? '').trim().slice(0, 40)
+        break
+      }
+    }
+    let needsUser = 0
+    for (const line of ((await readText([dir, '_orchestration', 'APPROVALS.md'].join(sep))) ?? '').split(NL)) {
+      if (line.trim().startsWith('|') && line.split('|').some(cell => ['pending', 'очікує'].includes(cell.trim().toLowerCase()))) needsUser += 1
+    }
+    if (tasks.length === 0 && !stage) return null
+    const isDone = (c: TaskRec): boolean => DONE.some(w => c.status.startsWith(w))
+    const open = tasks.filter(c => !isDone(c))
+    const known = tasks.map(c => c.estimate).filter((e): e is number => typeof e === 'number').sort((x, y) => x - y)
+    let hoursLeft: number | undefined
+    if (tasks.length > 0 && open.length === 0) hoursLeft = 0
+    else if (known.length > 0) {
+      const dflt = known[Math.floor(known.length / 2)] ?? 1
+      const now = Number(await $.clock.now())
+      const left = (c: TaskRec): number => {
+        const est = c.estimate ?? dflt
+        if (REVIEW.some(w => c.status.startsWith(w))) return est * 0.2
+        if (ACTIVE.some(w => c.status.startsWith(w)) && c.started) return Math.max(est * 0.1, est - (now - c.started) / 3600000)
+        return est
+      }
+      const waves = new Map<number, TaskRec[]>()
+      for (const c of open) waves.set(c.wave ?? 0, [...(waves.get(c.wave ?? 0) ?? []), c])
+      let sum = 0
+      for (const list of waves.values()) {
+        const parts = list.map(left)
+        const total = parts.reduce((x, y) => x + y, 0)
+        const workers = new Set(list.map(c => c.performer).filter(Boolean)).size
+        sum += Math.max(Math.max(...parts), total / Math.min(Math.max(1, workers), list.length))
+      }
+      let estimated = 0
+      let real = 0
+      for (const c of tasks) {
+        if (isDone(c) && c.estimate && c.started && c.finished && c.finished > c.started) {
+          estimated += c.estimate
+          real += (c.finished - c.started) / 3600000
+        }
+      }
+      const k = estimated > 0 ? Math.min(3, Math.max(0.5, real / estimated)) : 1
+      hoursLeft = Math.round(sum * k * 2) / 2
+    }
+    return {
+      stage,
+      total: tasks.length,
+      done: tasks.length - open.length,
+      review: tasks.filter(c => REVIEW.some(w => c.status.startsWith(w))).length,
+      blocked: tasks.filter(c => BLOCKED.some(w => c.status.startsWith(w))).length,
+      working: tasks.filter(c => ACTIVE.some(w => c.status.startsWith(w))).length,
+      needsUser,
+      ...(hoursLeft === undefined ? {} : { hoursLeft }),
+    }
   }
 
   // The pane of a watching chat writes what it shows, one file per project, so the dashboard reads those
@@ -298,11 +443,11 @@ const makeTools = ($: any) => {
     return 'p' + h
   }
   const lastLive = new Map<string, { key: string; at: number }>()
-  const publishLive = async (dir: string, members: Record<string, unknown>[]): Promise<void> => {
+  const publishLive = async (dir: string, members: Record<string, unknown>[], sum: ProjectSummary | null): Promise<void> => {
     const name = dir.slice(dir.lastIndexOf(sep) + 1)
     const slug = slugOf(name)
     const now = Number(await $.clock.now())
-    const project = { slug, name, members, working: members.filter(m => m.state === 'working').length, tasks: await listTasks(dir) }
+    const project = { slug, name, members, working: members.filter(m => m.state === 'working').length, tasks: await listTasks(dir), summary: sum }
     const key = JSON.stringify(project)
     const prev = lastLive.get(slug)
     if (prev && prev.key === key && now - prev.at < 8000) return
@@ -351,11 +496,11 @@ const makeTools = ($: any) => {
           const tf = await tasksFor(dir, e.name)
           const fresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
           const reported = fresh && typeof prog?.total === 'number' && prog.total > 0
-          const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
-          const done = typeof total === 'number' ? Math.min(total, reported ? (prog?.done ?? 0) : tf.done) : undefined
+          const total = reported ? prog?.total : tf.steps ? tf.steps.total : tf.total > 0 ? tf.total : undefined
+          const done = typeof total === 'number' ? Math.min(total, reported ? (prog?.done ?? 0) : tf.steps ? tf.steps.done : tf.done) : undefined
           if (isRun && !seenWorking.has(e.id)) seenWorking.set(e.id, now)
           if (!isRun) seenWorking.delete(e.id)
-          const base = prog?.startedAt && fresh ? prog.startedAt : seenWorking.get(e.id)
+          const base = prog?.startedAt && fresh ? prog.startedAt : (tf.startedAt ?? seenWorking.get(e.id))
           const elapsed = isRun && base ? now - base : undefined
           const eta = isRun && typeof total === 'number' && done && done > 0 && elapsed !== undefined && total > done ? (elapsed / done) * (total - done) : undefined
           const summary = meta?.postTurnSummary
@@ -365,9 +510,9 @@ const makeTools = ($: any) => {
             role,
             cls: classOf(e.name, e.class),
             state: isRun ? 'working' : 'idling',
-            blocked: !isRun && summary?.status_category === 'blocked',
-            task: (fresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail) ?? '',
-            note: (isRun && fresh ? prog?.note : undefined) ?? '',
+            blocked: !!tf.blocker || (!isRun && summary?.status_category === 'blocked'),
+            task: (fresh ? prog?.task : undefined) ?? tf.current ?? (isRun ? undefined : summary?.status_detail) ?? '',
+            note: tf.blocker || ((isRun && fresh ? prog?.note : undefined) ?? ''),
             done: done ?? null,
             total: total ?? null,
             elapsedMs: elapsed ?? null,
@@ -382,6 +527,7 @@ const makeTools = ($: any) => {
           members: out,
           working: out.filter(m => m.state === 'working').length,
           tasks: await listTasks(dir),
+          summary: await projSummary(dir),
         } as { slug: string; generatedAt?: number })
       }
     } catch {
@@ -394,7 +540,7 @@ const makeTools = ($: any) => {
     }
     return { generatedAt: now, projects: [...bySlug.values()] }
   }
-  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds: () => linkedRunning, progressFor, runningIds, tasksFor, snapshot, publishLive, diag }
+  return { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds: () => linkedRunning, progressFor, runningIds, tasksFor, snapshot, publishLive, projSummary, diag }
 }
 
 export const register: Register = on => {
@@ -421,7 +567,7 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
     })
 
-    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor, publishLive } = makeTools($)
+    const { sep, rosterDir, projectsDir, readJson, findMeta, findRosterDir, linkedRoster, linkedRunningIds, progressFor, runningIds, tasksFor, publishLive, projSummary } = makeTools($)
     let wasOpened = false
     const closedKey = (cwd: string): string => `closed:${cwd}`
 
@@ -462,22 +608,22 @@ export const register: Register = on => {
           const isFresh = !!prog?.updatedAt && now - prog.updatedAt < 6 * 3600 * 1000
           // The helper's own reports win; without them the bar is its task files: done of its own.
           const reported = isFresh && typeof prog?.total === 'number' && prog.total > 0
-          const total = reported ? prog?.total : tf.total > 0 ? tf.total : undefined
+          const total = reported ? prog?.total : tf.steps ? tf.steps.total : tf.total > 0 ? tf.total : undefined
           const hasSteps = typeof total === 'number' && total > 0
-          const done = hasSteps ? Math.min(total ?? 0, reported ? (prog?.done ?? 0) : tf.done) : undefined
-          const base = prog?.startedAt && isFresh ? prog.startedAt : nextSince[entry.id]
+          const done = hasSteps ? Math.min(total ?? 0, reported ? (prog?.done ?? 0) : tf.steps ? tf.steps.done : tf.done) : undefined
+          const base = prog?.startedAt && isFresh ? prog.startedAt : (tf.startedAt ?? nextSince[entry.id])
           const elapsed = isRun && base ? now - base : undefined
           const eta = isRun && hasSteps && done && done > 0 && elapsed !== undefined && (total ?? 0) > done ? (elapsed / done) * ((total ?? 0) - done) : undefined
           const summary = meta?.postTurnSummary
-          const task = (isFresh ? prog?.task : undefined) ?? (isRun ? tf.current : undefined) ?? (isRun ? undefined : summary?.status_detail)
+          const task = (isFresh ? prog?.task : undefined) ?? tf.current ?? (isRun ? undefined : summary?.status_detail)
           out.push({
             id: entry.id,
             name: entry.name,
             cls: classOf(entry.name, entry.class),
             state: isRun ? 'working' : 'idling',
-            isBlocked: !isRun && summary?.status_category === 'blocked',
+            isBlocked: !!tf.blocker || (!isRun && summary?.status_category === 'blocked'),
             task,
-            note: isRun ? (isFresh ? prog?.note : undefined) : !isRun && task === summary?.status_detail ? undefined : summary?.status_detail,
+            note: tf.blocker ? tf.blocker : isRun ? (isFresh ? prog?.note : undefined) : !isRun && task === summary?.status_detail ? undefined : summary?.status_detail,
             done,
             total: hasSteps ? total : undefined,
             elapsedMs: elapsed,
@@ -493,6 +639,8 @@ export const register: Register = on => {
         await update($, isOrch, () => isWatcher)
         // A project folder (a roster file, or a folder under Workspaces): publish what this pane shows.
         const projDir = fromFile ? projectDir : cwd.toLowerCase().includes(`${sep}workspaces${sep}`) ? cwd : undefined
+        const sum = projDir ? await projSummary(projDir) : null
+        await update($, summary, () => sum)
         if (isWatcher && projDir) {
           const lead = roster.orchestrator?.id
           await publishLive(
@@ -512,6 +660,7 @@ export const register: Register = on => {
               etaMs: m.etaMs ?? null,
               tasksDone: m.tasksDone ?? null,
             })),
+            sum,
           )
         }
         if (!wasOpened && out.length > 0 && isWatcher && !(await $.store.get(closedKey(cwd)))) {
@@ -609,6 +758,7 @@ export const register: Register = on => {
       Svg?: (p: Record<string, unknown>) => unknown
     }
     const list = await read($, members)
+    const sum = await read($, summary)
     if (list.length === 0) {
       return (
         <Box flexDirection="column">
@@ -631,6 +781,12 @@ export const register: Register = on => {
     for (let i = 0; i < list.length; i += perRow) rows.push(list.slice(i, i + perRow))
     return (
       <Box flexDirection="column">
+        {sum && Svg ? (
+          <Svg
+            source={summarySvg(sum)}
+            alt={`Project: ${sum.stage || 'no stage set'}. ${sum.done} of ${sum.total} tasks verified. ${sum.hoursLeft === undefined ? '' : `About ${sum.hoursLeft} hours left. `}${sum.blocked} blocked, ${sum.needsUser} waiting for you.`}
+          />
+        ) : null}
         {rows.map(row => (
           <Box flexDirection="row">
             {row.map(m => (

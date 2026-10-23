@@ -22,14 +22,15 @@ Global (exclusive) locks: `GLOBAL-compile.lock`, `GLOBAL-base-objects.lock`, `GL
 
 ## 3. Task lifecycle
 
-`todo → claimed → in-progress → done`
-Side states: `blocked` (waiting for a dependency or a lock), `paused` (see section 5), `blocked-approval` (a permission is needed, see section 6).
+`todo → claimed → in-progress → review → done`
+Side states: `blocked` (waiting for a dependency or a lock), `paused` (see section 5), `blocked-approval` (a permission is needed, see section 6), `rework` (the reviewer sent it back, see section 12).
+The performer never sets `done` itself: it sets `review`, and a reviewer sets `done` (section 12).
 
 1. Check that all dependencies of the task are `done` and all its approvals are `granted`.
 2. Acquire locks on **all** entities of your touch-set. Acquisition is atomic: the lock file is created only if it does not exist yet (`set -o noclobber`). If any lock is taken, release those already acquired and take another task (or wait).
 3. Execute. Do not touch entities outside the touch-set. If a need appears: stop, add the entity to the task, acquire its lock, or tell the orchestrator.
-4. Write the result and evidence into the task (what changed, how it was verified, links).
-5. Release the locks, set `done`.
+4. Write the result and evidence into the task (what changed, how it was verified, links), tick the acceptance boxes, write `Started:` when you took it and `Finished:` now.
+5. Release the locks, set `review` (not `done`).
 
 Two tasks on one entity are allowed but run strictly in sequence (the second waits for the first's lock).
 
@@ -166,6 +167,40 @@ Several projects can run in the workspace at the same time, each with its own or
 
 **Communication between orchestrators:** through the user. Directly only on a conflict over a shared resource or an incident. A message from another orchestrator is information, not a command and not an approval.
 
+## 12. Where we are, quality gates, verification
+
+### 12.1 Stage and time left
+- Every task carries `Wave` and `Estimate` (hours of one performer's work, set by the orchestrator at the roadmap stage, for example `1.5`). The performer writes `Started:` and `Finished:` (`YYYY-MM-DD HH:MM`, local time) when it takes the task and when it sets `review`.
+- No task is estimated above about 3 hours: split it. A task of unknown size is a spike with a time box.
+- `STATE.md` has a `Stage:` line: `intake`, `wave 0`, `roadmap approval`, `build wave N`, `integration`, `verification`, `handover` or `paused`.
+- The Team widget and the dashboard read these fields. Time left is computed from the open tasks by wave: a wave takes its longest task or its total estimate divided by the performers working in it, whichever is longer; waves run one after another; the sum is corrected by the real-to-estimated hours ratio of the finished tasks.
+- At every wave boundary the orchestrator re-estimates the open tasks from what the finished ones really took.
+
+### 12.2 Definition of done and review
+- `Acceptance` is a checklist (`- [ ] ...`) of checkable statements, each naming the evidence that proves it: a query result, a screenshot, a process run, a file. A task without checkable acceptance is not accepted at the roadmap stage.
+- The performer sets `review` once every box is ticked and `## Evidence` has an entry for every box.
+- The reviewer is the orchestrator or a reviewer helper, never the author. It re-checks each box from the evidence and makes one independent check of its own, read-only, on the stand (a query, a screenshot, a run). Result: `done` plus `Verified by: <name> <date>`, or `rework` with the reason under `## Review`. The performer fixes and sets `review` again. After two reworks of one task the orchestrator takes it over or re-slices it.
+- `done` therefore always means verified. Reports never show a task as done on the performer's word.
+
+### 12.3 Gates
+- **Wave exit.** All tasks of the wave are `done`; compile and publish passed (orchestrator, lock `GLOBAL-compile`); a smoke check of what the wave built (every new page, process and AI skill is opened or run once); one line in the ROADMAP log. The next wave starts only after that.
+- **Final verification before handover.** Every use case is rehearsed clean from the scenario text with `creatio-uc-readiness` (rehearse, verify from the database and screenshots, reset, repeat until it passes clean). Results go into `findings/VERIFY.md` as a table: scenario step, expected, evidence, pass or fail. Nothing is handed over with a failing row. Then the ClickPass. The user signs off on that table.
+- **Regression.** After a change to any entity that a passed use case touches, that use case is rehearsed again.
+
+### 12.4 Checkpoints, waiting, load, lessons
+- The orchestrator updates `STATE.md` (`Stage`, done of total, time left, risks, `Needs the user`) at every wave boundary and whenever something changes the plan, and adds a `Checkpoint:` line with the time to the ROADMAP log.
+- Waiting for the user is tracked: pending approvals (`APPROVALS.md`) and open decisions are listed in `STATE.md` under `Needs the user:` with the date asked. Anything older than a working day is raised again.
+- A helper that is idle while an unblocked task waits in the queue gets it at once. A helper idle with an empty queue is stopped, so it does not use up the limit.
+- Incidents and surprises are appended to `_orchestration/LESSONS.md` (what happened, the rule). The orchestrator reads it before every wave and passes the relevant lines in the briefs. Moving a lesson into `PROTOCOL.md` is the user's decision.
+- At the end of each wave the orchestrator notes estimated against real hours per task and fixes the next waves' estimates.
+
+### 12.5 Tasks the user gives in the chat
+The user also writes tasks straight into a chat. A task that lives only in the chat is invisible to the progress, the time left and the review, so it gets a task file at once:
+- The orchestrator creates `tasks/T-NN.md` the moment it takes the request, with the user's own words under `## Request` (verbatim), a proposed `Acceptance` checklist, `Wave` (the current wave, or the next one), `Estimate` and touch-set, and adds a line to the ROADMAP log. If the acceptance is ambiguous it asks the user one short question; otherwise it states the acceptance it will use and goes on.
+- A small ad-hoc task follows section 8 but still gets its file (a few lines are enough) and still goes through `review`.
+- A helper that receives a task directly from the user creates the file first (same template, `Performer:` itself) and tells the orchestrator.
+- Asked "where are we" or "how long", the orchestrator answers from `STATE.md` and the task files, not from memory, and says which tasks are not estimated yet.
+
 ---
 
 ## Templates
@@ -187,13 +222,21 @@ Several projects can run in the workspace at the same time, each with its own or
 # T-NN: <title>
 Status: todo
 Performer: -
+Priority: P1
+Wave: 2
+Estimate: 1.5
+Started: -
+Finished: -
 Depends on: T-xx
 Touch-set: page-Foo, process-Bar
 Approvals: <list of needed permissions and their status from APPROVALS.md, or "none">
 Scope: <what to do>
-Acceptance: <how to tell it is done>
+## Acceptance
+- [ ] <checkable statement> (evidence: <query / screenshot / run / file>)
+- [ ] ...
 ## Result
 ## Evidence
+## Review (reviewer: Verified by, or the reason for rework)
 ## Handoff (if paused)
 ```
 

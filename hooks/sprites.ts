@@ -2,7 +2,7 @@
 // Sprite construction (24x18 crab on a 30x28 grid, stamped from ASCII rows) and the
 // idea of one costume per class come from savvy-progress by johnnyvizz (MIT,
 // github.com/johnnyvizz/claude-kit); the classes, sleep state and layout are new.
-import type { Cls, Member } from '../types'
+import type { Cls, Member, ProjectSummary } from '../types'
 
 const CLAY = '#D97757'
 const INK = '#1F1E1D'
@@ -289,6 +289,31 @@ export const cardSvg = (m: Member, isRetro = false): string => {
 ${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
 ${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
 ${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}
+</svg>`
+}
+
+// The project card above the members: stage, tasks verified of all, time left, what blocks and what waits for the user.
+export const SUM_H = 66
+const fmtLeft = (h: number): string => (h <= 0 ? 'nothing left' : h < 1 ? `~${Math.round(h * 60)} min left` : h < 48 ? `~${h} h left` : `~${Math.round(h / 8)} working days left`)
+export const summarySvg = (s: ProjectSummary): string => {
+  const x0 = 12
+  const x1 = CARD_W - 12
+  const barW = x1 - x0
+  const done = s.total > 0 ? Math.min(1, s.done / s.total) : 0
+  const review = s.total > 0 ? Math.min(1 - done, s.review / s.total) : 0
+  const left = s.hoursLeft === undefined ? 'time left unknown' : fmtLeft(s.hoursLeft)
+  const flags = [s.blocked ? `<tspan class="warn">${s.blocked} blocked</tspan>` : '', s.needsUser ? `<tspan class="am">${s.needsUser} waiting for you</tspan>` : '']
+    .filter(Boolean)
+    .join('<tspan class="s"> · </tspan>')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${SUM_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${SUM_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${CSS}${CARD_CSS}<style>.am{fill:#B7791F}@media (prefers-color-scheme: dark){.am{fill:#E8A33D}}</style>
+<defs><clipPath id="sb"><rect x="${x0}" y="31" width="${barW}" height="6" rx="3"/></clipPath></defs>
+<rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${SUM_H - 1}" rx="12"/>
+<text class="t hl" x="${x0}" y="22" font-size="12">${esc(fit(s.stage || 'Project', 22))}</text>
+<text class="s" x="${x1}" y="22" font-size="12" text-anchor="end">${s.done} of ${s.total} verified</text>
+<rect class="track" x="${x0}" y="31" width="${barW}" height="6" rx="3"/>
+<g clip-path="url(#sb)"><rect x="${x0 + done * barW}" y="31" width="${(review * barW).toFixed(1)}" height="6" fill="#D9A92A" opacity=".55"/><rect x="${x0}" y="31" width="${(done * barW).toFixed(1)}" height="6" fill="#4C8C4A"/></g>
+<text class="s" x="${x0}" y="55" font-size="12">${esc(left)}</text>
+<text class="s" x="${x1}" y="55" font-size="12" text-anchor="end">${flags}</text>
 </svg>`
 }
 

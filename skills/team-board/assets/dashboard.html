@@ -53,6 +53,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .fname h2{margin:0;font-size:19px;font-weight:700;text-wrap:balance}
 .fname .meta{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
 .fname .right{display:flex;align-items:center;gap:10px}
+.sumline{font-size:13px;color:var(--ink);margin-top:4px}
+.sumline span+span::before{content:" \00b7 ";color:var(--muted)}
+.sumline .bad{color:var(--stamp-bad)} .sumline .need{color:var(--accent)} .sumline .mute{color:var(--muted)}
 .mini{width:70px;height:10px;border:2px solid var(--ink);background:var(--line);overflow:hidden}
 .mini i{display:block;height:100%;background:var(--accent)}
 .cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);gap:20px 28px;align-items:start}
@@ -66,7 +69,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .rbar{height:4px;background:var(--line);overflow:hidden}
 .rbar i{display:block;height:100%;background:var(--stamp-ok)}
 .t{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 8px;padding:5px 0 5px 8px;border-left:3px solid var(--line);font-size:14px}
-.t.s-working{border-left-color:var(--stamp-ok)} .t.s-paused{border-left-color:var(--stamp-bad)} .t.s-done{opacity:.6}
+.t.s-review{border-left-color:var(--accent)} .t.s-working{border-left-color:var(--stamp-ok)} .t.s-paused{border-left-color:var(--stamp-bad)} .t.s-done{opacity:.6}
 .tid{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);align-self:baseline;white-space:nowrap}
 .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tm{grid-column:2;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -92,7 +95,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 // Sprite construction (24x18 crab on a 30x28 grid, stamped from ASCII rows) and the
 // idea of one costume per class come from savvy-progress by johnnyvizz (MIT,
 // github.com/johnnyvizz/claude-kit); the classes, sleep state and layout are new.
-                                           
+                                                           
 
 const CLAY = '#D97757'
 const INK = '#1F1E1D'
@@ -382,6 +385,31 @@ ${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}
 </svg>`
 }
 
+// The project card above the members: stage, tasks verified of all, time left, what blocks and what waits for the user.
+const SUM_H = 66
+const fmtLeft = (h        )         => (h <= 0 ? 'nothing left' : h < 1 ? `~${Math.round(h * 60)} min left` : h < 48 ? `~${h} h left` : `~${Math.round(h / 8)} working days left`)
+const summarySvg = (s                )         => {
+  const x0 = 12
+  const x1 = CARD_W - 12
+  const barW = x1 - x0
+  const done = s.total > 0 ? Math.min(1, s.done / s.total) : 0
+  const review = s.total > 0 ? Math.min(1 - done, s.review / s.total) : 0
+  const left = s.hoursLeft === undefined ? 'time left unknown' : fmtLeft(s.hoursLeft)
+  const flags = [s.blocked ? `<tspan class="warn">${s.blocked} blocked</tspan>` : '', s.needsUser ? `<tspan class="am">${s.needsUser} waiting for you</tspan>` : '']
+    .filter(Boolean)
+    .join('<tspan class="s"> · </tspan>')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${SUM_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${SUM_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${CSS}${CARD_CSS}<style>.am{fill:#B7791F}@media (prefers-color-scheme: dark){.am{fill:#E8A33D}}</style>
+<defs><clipPath id="sb"><rect x="${x0}" y="31" width="${barW}" height="6" rx="3"/></clipPath></defs>
+<rect class="cb" x="0.5" y="0.5" width="${CARD_W - 1}" height="${SUM_H - 1}" rx="12"/>
+<text class="t hl" x="${x0}" y="22" font-size="12">${esc(fit(s.stage || 'Project', 22))}</text>
+<text class="s" x="${x1}" y="22" font-size="12" text-anchor="end">${s.done} of ${s.total} verified</text>
+<rect class="track" x="${x0}" y="31" width="${barW}" height="6" rx="3"/>
+<g clip-path="url(#sb)"><rect x="${x0 + done * barW}" y="31" width="${(review * barW).toFixed(1)}" height="6" fill="#D9A92A" opacity=".55"/><rect x="${x0}" y="31" width="${(done * barW).toFixed(1)}" height="6" fill="#4C8C4A"/></g>
+<text class="s" x="${x0}" y="55" font-size="12">${esc(left)}</text>
+<text class="s" x="${x1}" y="55" font-size="12" text-anchor="end">${flags}</text>
+</svg>`
+}
+
 // The same tile as a page fragment, for the pop-out window (CSS in the page does the layout).
 const tileHtml = (m        )         => {
   const isRun = m.state === 'working'
@@ -408,10 +436,22 @@ const tileHtml = (m        )         => {
     var m = norm(raw), svg = cardSvg(m, true);
     return '<div class="mc"><img alt="'+esc(m.name+', '+statusOf(m))+'" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'"></div>';
   }
-  var RANK = {working:0, paused:1, queued:2, unknown:3, done:4};
+  var RANK = {working:0, review:0.5, paused:1, queued:2, unknown:3, done:4};
   function taskHtml(t){
-    var meta=[t.performer, t.priority, t.depends?'after '+t.depends:''].filter(Boolean).join(' \u00b7 ');
+    var meta=[t.performer, t.priority, t.estimate?t.estimate+' h':'', t.depends?'after '+t.depends:''].filter(Boolean).join(' \u00b7 ');
     return '<div class="t s-'+esc(t.status)+'"><span class="tid">'+esc(t.id)+'</span><span class="tt" title="'+esc(t.title)+'">'+esc(t.title)+'</span>'+(meta?'<span class="tm">'+esc(meta)+'</span>':'')+'</div>';
+  }
+  function leftText(h){ return h<=0 ? 'nothing left' : h<1 ? '~'+Math.round(h*60)+' min left' : h<48 ? '~'+h+' h left' : '~'+Math.round(h/8)+' working days left'; }
+  function sumHtml(p){
+    var s = p.summary; if(!s) return '';
+    var parts = [];
+    if(s.stage) parts.push('<span>'+esc(s.stage)+'</span>');
+    parts.push('<span>'+s.done+' of '+s.total+' verified</span>');
+    parts.push(s.hoursLeft==null ? '<span class="mute">time left unknown</span>' : '<span>'+leftText(s.hoursLeft)+'</span>');
+    if(s.review) parts.push('<span>'+s.review+' in review</span>');
+    if(s.blocked) parts.push('<span class="bad">'+s.blocked+' blocked</span>');
+    if(s.needsUser) parts.push('<span class="need">'+s.needsUser+' waiting for you</span>');
+    return '<div class="sumline">'+parts.join('')+'</div>';
   }
   function roadPct(p){ var ts=p.tasks||[]; return ts.length ? Math.round(ts.filter(function(t){return t.status==='done'}).length/ts.length*100) : 0; }
   function roadHtml(p){
@@ -457,7 +497,7 @@ const tileHtml = (m        )         => {
     }
     shown.forEach(function(p){
       out += '<section class="file" data-slug="'+esc(p.slug)+'"><div class="fname"><div><h2>'+esc(p.name)+'</h2><div class="meta">'+
-        p.working+' of '+p.members.length+' working · '+(p.fresh ? 'live' : 'updated '+ago(p.generatedAt))+'</div></div><div class="right">'+
+        p.working+' of '+p.members.length+' working · '+(p.fresh ? 'live' : 'updated '+ago(p.generatedAt))+'</div>'+(showStopped?'':sumHtml(p))+'</div><div class="right">'+
         (showStopped ? '' : '<span class="mini" title="Roadmap '+roadPct(p)+'% done"><i style="width:'+roadPct(p)+'%"></i></span>')+
         '<button class="btn stop" type="button" data-act="'+(showStopped?'resume':'stop')+'">'+(showStopped?'Resume watching':'Stop watching')+'</button></div></div>'+
         (showStopped ? '' : '<div class="cols"><div class="members">'+p.members.map(memberHtml).join('')+'</div>'+roadHtml(p)+'</div>')+'</section>';
