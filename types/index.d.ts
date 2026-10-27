@@ -1,5 +1,16 @@
 export type Cls = 'mage' | 'paladin' | 'rogue' | 'cleric' | 'ranger' | 'barbarian' | 'king'
 
+/** What a member has closed (tasks of its own with status done), from the task files. */
+export type ClosedStats = {
+  total: number
+  /** Closed on the same day as now (needs a `Finished` time). */
+  today: number
+  /** Share of the reviewed closed tasks that passed the review the first time; absent under two reviewed tasks. */
+  firstPass?: number
+  /** The latest closed tasks, oldest first: 0 passed first time, 1 after one rework, 2 after more, -1 no review data. */
+  recent: number[]
+}
+
 export type Member = {
   id: string
   name: string
@@ -15,6 +26,10 @@ export type Member = {
   etaMs?: number
   /** Tasks of its own that are done (from the task files); absent when it has none. */
   tasksDone?: number
+  /** Statistics of the tasks it has closed. */
+  closed?: ClosedStats
+  /** The estimate (hours) of the task it is on now. */
+  estimateH?: number
   /** Only the dashboard knows it: the orchestrator card is drawn in the accent colour. */
   role?: string
 }

@@ -100,7 +100,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   function ago(t){ if(!t) return 'never'; var m=Math.round((Date.now()-t)/60000); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'; }
   function norm(m){ return { id:m.id, name:m.name, cls:m.cls, state:m.state, isBlocked:!!m.blocked, task:m.task||undefined,
     note:m.note||undefined, done:m.done==null?undefined:m.done, total:m.total==null?undefined:m.total,
-    elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, tasksDone:m.tasksDone==null?undefined:m.tasksDone, role:m.role }; }
+    elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, closed:m.closed==null?undefined:m.closed, estimateH:m.estimateH==null?undefined:m.estimateH, tasksDone:m.tasksDone==null?undefined:m.tasksDone, role:m.role }; }
   // The card is the Team pane's own drawing, shown as an image so its styles stay inside it.
   function memberHtml(raw){
     var m = norm(raw), svg = cardSvg(m, true);

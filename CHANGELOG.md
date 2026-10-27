@@ -2,6 +2,9 @@
 
 Versions of the `demo-team-roster` plugin, newest first. Details are in the git history.
 
+## 0.8.0 (2026-10-27): closed-task statistics instead of a progress bar
+- A member card shows what it has closed: the count by the name, the share that passed the review first time, one square per closed task (green first time, amber after one rework, red after more, grey no review data), "N closed · M today", and time on the current task against its estimate. The progress bar is gone.
+
 ## 0.7.x (2026-10-23): the protocol checked by a tool
 - `kb.py lint`: finds what the protocol forbids (a task done without `Verified by`, verified by its own performer, unticked acceptance, no evidence, a high-risk task without an approved plan, no estimate). Errors in a `Protocol: 2` project, warnings in older ones.
 - A project now carries its own copy of the tool (`_orchestration/kb.py`); the canonical roadmap and task templates live only in `PROTOCOL.md`; `upgrade-running-project.md` moves a running project to protocol 2.

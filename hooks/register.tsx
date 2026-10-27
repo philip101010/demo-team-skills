@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Member, ProjectSummary } from '../types'
+import type { ClosedStats, Member, ProjectSummary } from '../types'
 import { cardSvg, classOf, pctOf, statusOf, stepOf, summarySvg } from './sprites'
 
 const PANE = 'demo-team-roster'
@@ -48,6 +48,21 @@ type TaskRec = {
   blocker: string
   boxesDone: number
   boxesTotal: number
+  /** Lines of the Review section that send the task back. */
+  reworks: number
+  /** A 'Verified by' line stands under Review. */
+  verified: boolean
+}
+
+type TaskFacts = {
+  current?: string
+  done: number
+  total: number
+  steps?: { done: number; total: number }
+  startedAt?: number
+  blocker?: string
+  estimateH?: number
+  closed?: ClosedStats
 }
 type SessionMeta = {
   cliSessionId?: string
@@ -289,7 +304,15 @@ const makeTools = ($: any) => {
           }
           let boxesDone = 0
           let boxesTotal = 0
+          let reworks = 0
+          let verified = false
+          let inReview = false
           for (const line of all) {
+            if (line.startsWith('## ')) inReview = line.slice(3).trim().toLowerCase().startsWith('review')
+            if (inReview) {
+              if (/^\s*[-*]\s*(?:\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}\s*)?rework/i.test(line)) reworks += 1
+              if (/verified by\s*:?\s*\S/i.test(line)) verified = true
+            }
             const m = /^\s*[-*] \[( |x|X)\]/.exec(line)
             if (!m) continue
             boxesTotal += 1
@@ -311,6 +334,8 @@ const makeTools = ($: any) => {
             blocker,
             boxesDone,
             boxesTotal,
+            reworks,
+            verified,
           }
           taskCache.set(path, c)
         }
@@ -324,20 +349,21 @@ const makeTools = ($: any) => {
 
   // What the task files say about a helper: its current task, how many of its tasks are done, the steps of the
   // current one (its checkboxes) and what blocks it.
-  const tasksFor = async (
-    cwd: string,
-    name: string,
-  ): Promise<{ current?: string; done: number; total: number; steps?: { done: number; total: number }; startedAt?: number; blocker?: string }> => {
-    const res: { current?: string; done: number; total: number; steps?: { done: number; total: number }; startedAt?: number; blocker?: string } = { done: 0, total: 0 }
+  const tasksFor = async (cwd: string, name: string): Promise<TaskFacts> => {
+    const res: TaskFacts = { done: 0, total: 0 }
     const first = name.toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')[0] ?? ''
     if (!first) return res
+    const closed: TaskRec[] = []
     for (const c of await loadTasks(cwd)) {
       if (!c.performer.includes(first)) continue
       res.total += 1
-      if (DONE.some(w => c.status.startsWith(w))) res.done += 1
-      else if (!res.current && (ACTIVE.some(w => c.status.startsWith(w)) || REVIEW.some(w => c.status.startsWith(w)))) {
+      if (DONE.some(w => c.status.startsWith(w))) {
+        res.done += 1
+        closed.push(c)
+      } else if (!res.current && (ACTIVE.some(w => c.status.startsWith(w)) || REVIEW.some(w => c.status.startsWith(w)))) {
         res.current = c.title
         res.startedAt = c.started
+        res.estimateH = c.estimate
         if (c.boxesTotal > 0) res.steps = { done: c.boxesDone, total: c.boxesTotal }
       }
       if (!res.blocker && BLOCKED.some(w => c.status.startsWith(w))) {
@@ -345,6 +371,19 @@ const makeTools = ($: any) => {
         if (!res.current) res.current = c.title
         if (!res.steps && c.boxesTotal > 0) res.steps = { done: c.boxesDone, total: c.boxesTotal }
         res.blocker = c.blocker || (c.status.startsWith('blocked-approval') ? 'approval needed' : c.status.startsWith('blocked') ? 'waiting for a dependency' : '')
+      }
+    }
+    if (res.total > 0) {
+      // What it has closed: how many, how many today, how often the review passed first time, and the latest
+      // ones one by one (0 passed first time, 1 after one rework, 2 after more, -1 no review data).
+      const today = new Date(Number(await $.clock.now())).toDateString()
+      closed.sort((a, b) => (a.finished ?? 0) - (b.finished ?? 0))
+      const reviewed = closed.filter(c => c.verified || c.reworks > 0)
+      res.closed = {
+        total: closed.length,
+        today: closed.filter(c => c.finished !== undefined && new Date(c.finished).toDateString() === today).length,
+        ...(reviewed.length >= 2 ? { firstPass: reviewed.filter(c => c.reworks === 0).length / reviewed.length } : {}),
+        recent: closed.slice(-12).map(c => (c.reworks > 0 ? Math.min(2, c.reworks) : c.verified ? 0 : -1)),
       }
     }
     return res
@@ -518,6 +557,8 @@ const makeTools = ($: any) => {
             elapsedMs: elapsed ?? null,
             etaMs: eta ?? null,
             tasksDone: tf.total > 0 ? tf.done : null,
+            closed: tf.closed ?? null,
+            estimateH: tf.estimateH ?? null,
           })
         }
         projects.push({
@@ -629,6 +670,8 @@ export const register: Register = on => {
             elapsedMs: elapsed,
             etaMs: eta,
             tasksDone: tf.total > 0 ? tf.done : undefined,
+            closed: tf.closed,
+            estimateH: tf.estimateH,
           })
         }
         await update($, members, () => out)
@@ -659,6 +702,8 @@ export const register: Register = on => {
               elapsedMs: m.elapsedMs ?? null,
               etaMs: m.etaMs ?? null,
               tasksDone: m.tasksDone ?? null,
+              closed: m.closed ?? null,
+              estimateH: m.estimateH ?? null,
             })),
             sum,
           )
@@ -792,7 +837,7 @@ export const register: Register = on => {
             {row.map(m => (
               <Box width={width}>
                 {Svg ? (
-                  <Svg source={cardSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}. ${pctOf(m)} ${m.task ?? ''} ${stepOf(m)} ${typeof m.tasksDone === 'number' ? `${m.tasksDone} tasks done.` : ''}`.trim()} />
+                  <Svg source={cardSvg(m)} alt={`${m.name}, ${m.cls}, ${statusOf(m)}. ${m.task ?? ''} ${stepOf(m)} ${m.closed ? `${m.closed.total} closed, ${m.closed.today} today.` : ''}`.trim()} />
                 ) : (
                   <Text wrap="truncate-end">
                     {m.state === 'working' ? '>' : 'z'} {m.name} {pctOf(m) || EMPTY} {m.task ?? EMPTY}

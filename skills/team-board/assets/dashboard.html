@@ -353,33 +353,43 @@ const cardSvg = (m        , isRetro = false)         => {
   const isRun = m.state === 'working'
   const isAsleep = !isRun
   const isLead = isRetro && m.role === 'orchestrator'
-  const color = ACCENT[m.cls]
   const x0 = 92
   const x1 = CARD_W - 12
-  const barW = x1 - x0
-  const hasSteps = typeof m.total === 'number' && m.total > 0
-  const frac = hasSteps ? Math.min(1, (m.done ?? 0) / (m.total ?? 1)) : 0
-  const live = isRun || m.isBlocked
   const zs = isAsleep
     ? `<text class="m z1" x="30" y="12" font-size="9">z</text><text class="m z2" x="34" y="9" font-size="11">Z</text><text class="m z3" x="40" y="6" font-size="13">Z</text>`
     : ''
-  const fill = !live
-    ? ''
-    : hasSteps
-      ? `<rect x="${x0}" y="28" width="${Math.max(3, frac * barW).toFixed(1)}" height="6" fill="${m.isBlocked ? WARN : color}" clip-path="url(#bar)"/>`
-      : `<g clip-path="url(#bar)"><g class="ind" style="--w:${Math.round(barW * 0.7)}px"><rect x="${x0}" y="28" width="${Math.round(barW * 0.3)}" height="6" fill="${color}" opacity=".85"/></g></g>`
   const text = (cls        , x        , y        , s        , anchor = 'start')         =>
     `<text class="${cls}" x="${x}" y="${y}" font-size="12" text-anchor="${anchor}">${esc(s)}</text>`
   const task = m.task ?? (isRun ? 'working…' : DASH)
   const step = stepOf(m) || DASH
   const badge = m.isBlocked ? `<circle cx="78" cy="16" r="8" fill="${WARN}"/><text x="78" y="20" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">!</text>` : ''
+  // What it has closed, one square per task: green passed the review first time, amber after one rework, red after
+  // more, grey no review data. A ring after them is the task it is on now. Empty slots are faint.
+  const closed = m.closed
+  const onIt = isRun || m.isBlocked
+  const shown = (closed?.recent ?? []).slice(-(onIt ? 11 : 12))
+  const SQ = 10
+  const slot = (i        )         => x0 + i * (SQ + 3)
+  const rx = isRetro ? 0 : 2
+  const squares = Array.from({ length: 12 }, (_, i) => {
+    const v = shown[i]
+    if (v !== undefined) return `<rect x="${slot(i)}" y="28" width="${SQ}" height="8" rx="${rx}" fill="${v === 0 ? '#4C8C4A' : v === 1 ? '#D9A92A' : v >= 2 ? WARN : '#9AA086'}"/>`
+    if (onIt && i === shown.length) return `<rect x="${slot(i) + 0.75}" y="28.75" width="${SQ - 1.5}" height="6.5" rx="${rx}" fill="none" stroke="${m.isBlocked ? WARN : ACCENT[m.cls]}" stroke-width="1.5"/>`
+    return `<rect class="track" x="${slot(i)}" y="28" width="${SQ}" height="8" rx="${rx}" opacity=".55"/>`
+  }).join('')
+  const count = closed ? closed.total : m.tasksDone
+  const firstPass = closed?.firstPass !== undefined ? `${Math.round(closed.firstPass * 100)}% first pass` : DASH
+  const totals = closed && closed.total > 0 ? `${closed.total} closed · ${closed.today} today` : DASH
+  // Time on the current task against its estimate ("47m/1.5h"); the estimate is dropped when the row is too long.
+  const spent = onIt ? elapsedOf(m) : ''
+  const withEstimate = spent && m.estimateH ? `${spent}/${m.estimateH}h` : spent
+  const now = spent ? (totals.length + withEstimate.length > 27 ? spent : withEstimate) : DASH
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H + CARD_GAP}" viewBox="0 0 ${CARD_W} ${CARD_H + CARD_GAP}" font-family="Anthropic Sans, Inter, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif">${cssFor(m)}${CARD_CSS}${isRetro ? RETRO_CSS : ''}
-<defs><clipPath id="bar"><rect x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}"/></clipPath></defs>
 <rect class="cb${isLead ? ' lead' : ''}" x="${isRetro ? 1 : 0.5}" y="${isRetro ? 1 : 0.5}" width="${CARD_W - (isRetro ? 2 : 1)}" height="${CARD_H - (isRetro ? 2 : 1)}" rx="${isRetro ? 0 : 12}"/>
 <svg x="12" y="16" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${GRID_W} ${GRID_H}">${sprite(m.cls, isAsleep, 3, 3, 1.25)}${zs}</svg>${badge}
-<rect class="track" x="${x0}" y="28" width="${barW}" height="6" rx="${isRetro ? 0 : 3}" opacity="${live ? 1 : 0.55}"/>${fill}
-<text class="${isLead ? 'ld' : 't'} hl" x="${x0}" y="22" font-size="12">${esc(fit(m.name, 18))}${typeof m.tasksDone === 'number' ? `<tspan class="m" dx="6" font-weight="400">${m.tasksDone}</tspan>` : ''}</text>${text('s', x1, 22, pctOf(m) || DASH, 'end')}
-${text('s', x0, 51, elapsedOf(m) || DASH)}${text('s', x1, 51, etaOf(m) || DASH, 'end')}
+<text class="${isLead ? 'ld' : 't'} hl" x="${x0}" y="22" font-size="12">${esc(fit(m.name, 18))}${typeof count === 'number' ? `<tspan class="m" dx="6" font-weight="400">${count}</tspan>` : ''}</text>${text('s', x1, 22, firstPass, 'end')}
+${squares}
+<text class="s" x="${x0}" y="51" font-size="11">${esc(totals)}</text><text class="s" x="${x1}" y="51" font-size="11" text-anchor="end">${esc(now)}</text>
 ${text(isRun ? 't' : 'm', x0, 66, fit(task, 26))}
 ${text(m.isBlocked ? 'warn' : 's', x0, 81, fit(step, 26))}
 </svg>`
@@ -430,7 +440,7 @@ const tileHtml = (m        )         => {
   function ago(t){ if(!t) return 'never'; var m=Math.round((Date.now()-t)/60000); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'; }
   function norm(m){ return { id:m.id, name:m.name, cls:m.cls, state:m.state, isBlocked:!!m.blocked, task:m.task||undefined,
     note:m.note||undefined, done:m.done==null?undefined:m.done, total:m.total==null?undefined:m.total,
-    elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, tasksDone:m.tasksDone==null?undefined:m.tasksDone, role:m.role }; }
+    elapsedMs:m.elapsedMs==null?undefined:m.elapsedMs, etaMs:m.etaMs==null?undefined:m.etaMs, closed:m.closed==null?undefined:m.closed, estimateH:m.estimateH==null?undefined:m.estimateH, tasksDone:m.tasksDone==null?undefined:m.tasksDone, role:m.role }; }
   // The card is the Team pane's own drawing, shown as an image so its styles stay inside it.
   function memberHtml(raw){
     var m = norm(raw), svg = cardSvg(m, true);
